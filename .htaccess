@@ -1,0 +1,86 @@
+# Litecoin Explorer Apache config. Drop the folder into the docroot and go.
+# Requires mod_rewrite; mod_headers recommended.
+
+Options -Indexes
+DirectoryIndex index.php
+
+# Cap request bodies (defense-in-depth vs oversized-POST abuse). The broadcast /
+# decode / PSBT tools POST a raw tx hex or PSBT; a standard tx is well under this. 2 MiB
+# fits even a large multi-input tx's hex while still bounding abuse. Must stay >= the hex
+# a legit broadcast can carry, else Apache 413s before PHP can validate it.
+LimitRequestBody 2097152
+
+# ---- block source / data / config ----------------------------------------
+RewriteEngine On
+
+# The /tools EXPLORER PAGE must route to the front controller — the physical tools/
+# directory (CLI scripts) would otherwise shadow it (dir passthrough -> 403). Route the
+# bare page first, before the deny + dir rules below claim it.
+RewriteRule ^tools/?$ index.php [L]
+
+# Internal directories and the live config must never be served directly. tools/ is
+# denied only WITH a path after it (the CLI scripts), so /tools (handled above) survives.
+# [NC] hardens against a case-insensitive filesystem serving e.g. /Tools/snapshot.php
+# (the CLI scripts also self-guard on PHP_SAPI, so this is defense-in-depth).
+RewriteRule ^(lib|views|db)(/|$) - [F,NC]
+RewriteRule ^tools/.+ - [F,NC]
+RewriteRule ^config\.php$ - [F,NC]
+
+# Dotfiles (.git, .htaccess, .gitignore, etc.) except ACME challenges.
+RewriteRule (^|/)\.(?!well-known/) - [F]
+
+# Defense in depth: deny sensitive extensions by basename.
+<FilesMatch "\.(sqlite|sqlite-wal|sqlite-shm|db|db-wal|db-shm|db-journal|md|bak|orig|swp|inc)$|(^|/)config\.example\.php$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# ---- front controller -----------------------------------------------------
+# Serve real files/dirs (assets, robots.txt, sitemap.xml, manifest) directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+# Everything else is routed through index.php (which parses REQUEST_URI).
+RewriteRule ^ index.php [L]
+
+# ---- headers --------------------------------------------------------------
+<IfModule mod_headers.c>
+  # 'always' so the headers attach to error responses too, not just 2xx.
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  # HSTS is left to the CDN/proxy (Cloudflare), matching the sibling sites.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+  # Long-cache static assets (they're versioned with ?v=).
+  <FilesMatch "\.(css|js|svg|woff2?|png|ico|webmanifest)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  # The service worker must revalidate so updates propagate.
+  <FilesMatch "^sw\.js$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+# ---- compression ----------------------------------------------------------
+# Text responses (HTML pages, Esplora JSON, CSS/JS, SVG) compress ~4-8x. This
+# shrinks the origin->edge (and any non-Cloudflare) transfer of dynamic bodies
+# that the CDN does not cache. Binary /raw octet-stream is deliberately excluded
+# (already compact, and re-compressing wastes CPU). Both modules emit Vary
+# themselves, so no manual Vary is needed. Brotli is preferred when available;
+# mod_deflate (gzip) is the universal fallback.
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/xml \
+    application/json application/javascript application/xml image/svg+xml \
+    application/manifest+json
+</IfModule>
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml \
+    application/json application/javascript application/xml image/svg+xml \
+    application/manifest+json
+</IfModule>

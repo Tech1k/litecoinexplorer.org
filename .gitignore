@@ -1,0 +1,19 @@
+# Secrets: node RPC credentials.
+config.php
+
+# SQLite response cache (reproducible from the chain; never commit).
+db/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Editor / OS cruft.
+*.swp
+*.bak
+*.orig
+.DS_Store
