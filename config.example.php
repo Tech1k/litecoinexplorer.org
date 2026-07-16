@@ -10,10 +10,11 @@
  *   - rpc:      litecoind JSON-RPC (blocks, tx, mempool, fees, broadcast,
  *               MWEB peg data). Requires txindex=1 for arbitrary tx lookup.
  *   - electrum: an Electrum-protocol server (the address index: scripthash
- *               history / balance / utxo). Use spesmilo/ElectrumX
- *               (COIN=Litecoin NET=mainnet) - the Rust electrs-ltc panics on
- *               MWEB blocks. Plaintext TCP on localhost is fine; set tls=true
- *               only if it terminates TLS.
+ *               history / balance / utxo). spesmilo/ElectrumX (COIN=Litecoin
+ *               NET=mainnet) or the Foundation's rust-litecoin/electrs-ltc both
+ *               work - the client only uses standard scripthash methods.
+ *               Plaintext TCP on localhost is fine; set tls=true only if it
+ *               terminates TLS.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
@@ -95,6 +96,15 @@ return [
     // Extra Host headers to trust for absolute URLs (besides canonical_host),
     // e.g. ['www.litecoinexplorer.org']. Anything else falls back to canonical_host.
     'allowed_hosts' => [],
+
+    // Trust Cloudflare's 'CF-Connecting-IP' header as the real client IP for the
+    // per-IP rate limits on expensive routes. Correct behind Cloudflare (the
+    // documented setup), where the origin firewall to Cloudflare's ranges is what
+    // stops a direct caller from forging it. Set false if the origin is exposed
+    // directly or sits behind a different proxy, so a spoofed header can't reset a
+    // bucket (limits then key off REMOTE_ADDR). No IP list to keep in sync, so a
+    // Cloudflare range change never over-throttles.
+    'trust_cf_ip' => true,
 
     // Optionally point the MWEBscan analysis overlay at a keyed / allow-listed
     // instance (string for all, or an array keyed by network slug). The public

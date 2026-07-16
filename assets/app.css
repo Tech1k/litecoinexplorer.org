@@ -347,7 +347,7 @@ footer a{color:var(--muted)} footer a:hover{color:var(--text)}
   table.kv th{padding:10px 0 0;font-size:12px}
   table.kv td{padding:2px 0 10px;font-size:13px}
   /* nopad cards (fees & reward, node UTXO) have no card padding to indent by, so on
-     mobile their kv cells (which drop horizontal padding above) would hug the edge —
+     mobile their kv cells (which drop horizontal padding above) would hug the edge -
      give those cells the gutter back directly. */
   .card-b.nopad table.kv th,.card-b.nopad table.kv td{padding-left:var(--s3);padding-right:var(--s3)}
   table.kv tr{display:block;border-bottom:1px solid var(--border)}

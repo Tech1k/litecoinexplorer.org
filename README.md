@@ -48,8 +48,10 @@ combines an **ElectrumX** server (the address/scripthash index) with **litecoind
   `gmp` is required for the xpub address-derivation page (optional; the page hides itself
   if absent).
 - `litecoind` (mainnet) with **`txindex=1`**.
-- **spesmilo/ElectrumX** (`COIN=Litecoin NET=mainnet`) - the Rust `electrs-ltc` panics on
-  MWEB blocks. See [DEPLOY.md](DEPLOY.md).
+- An Electrum-protocol address index: **spesmilo/ElectrumX** (`COIN=Litecoin NET=mainnet`)
+  or the Litecoin Foundation's **`rust-litecoin/electrs-ltc`** (the indexer behind
+  litecoinspace.org). Either works - the client only uses standard scripthash methods.
+  See [DEPLOY.md](DEPLOY.md).
 
 ## Quick start
 

@@ -135,16 +135,21 @@ function cache_remember(string $key, int $ttl, callable $producer)
  * the request is ALLOWED, false if it should be rejected. Best-effort and
  * fail-open (returns true when the cache or client IP is unavailable): this is
  * anti-amplification for expensive routes (xpub derivation, OG rendering), not
- * access control. Behind Cloudflare the real client is CF-Connecting-IP; the
- * origin should only accept Cloudflare traffic (see DEPLOY.md) so it is trusted.
+ * access control. Behind Cloudflare (the documented topology) the real client is
+ * CF-Connecting-IP, and the origin firewall to Cloudflare's ranges (DEPLOY.md) is
+ * what stops a direct caller from forging it. Deployments NOT behind Cloudflare
+ * should set 'trust_cf_ip' => false so a spoofed header can't reset a bucket.
  */
 function ts_rate_limit(string $bucket, int $max, int $window): bool
 {
     if ($max < 1 || $window < 1) {
         return true;
     }
-    $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP']
-        : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+    $remote  = $_SERVER['REMOTE_ADDR'] ?? '';
+    $trustCf = ts_config()['trust_cf_ip'] ?? true;
+    $ip = ($trustCf && !empty($_SERVER['HTTP_CF_CONNECTING_IP']))
+        ? (string) $_SERVER['HTTP_CF_CONNECTING_IP']
+        : $remote;
     if ($ip === '') {
         return true;                              // can't identify the caller -> fail open
     }

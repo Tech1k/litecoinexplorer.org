@@ -27,10 +27,15 @@ Litecoin Explorer needs an Electrum-protocol server for the address/scripthash i
 (`get_history` / `get_balance` / `listunspent`). It's indexer-agnostic; it only needs the
 protocol on the host:port set in `config.php`. Bind it to localhost.
 
-**Do not use the Rust `electrs-ltc`**: it panics parsing MWEB blocks from `blk*.dat` (mainnet
-is far past MWEB activation). Use **spesmilo/ElectrumX**, whose `DeserializerLitecoin` tolerates
-MWEB blocks. MWEB itself is served by a separate wallet-side daemon (`ltcmweb/mwebd`), not needed
-here; the Electrum server only indexes the transparent chain.
+Two indexers work: **spesmilo/ElectrumX** (`COIN=Litecoin NET=mainnet`) and the Litecoin
+Foundation's **`rust-litecoin/electrs-ltc`** (the Rust indexer behind litecoinspace.org). The
+setup below is for ElectrumX, which is what this instance runs; electrs-ltc is a drop-in
+alternative on the same protocol (the client only uses standard scripthash methods). If you use
+electrs-ltc, take a current build (its `mempool` branch): MWEB parsing was added in its May-2026
+switch to the `rust-litecoin` crate, so an older build - or the archived `electrs-ltc-archive`,
+which used stock `rust-bitcoin` - panics on MWEB blocks. That older build is what earlier versions
+of these docs warned about. MWEB itself is served by a separate wallet-side daemon
+(`ltcmweb/mwebd`), not needed here; the Electrum server only indexes the transparent chain.
 
 ```sh
 sudo apt install -y python3-venv python3-dev build-essential libleveldb-dev
@@ -97,6 +102,115 @@ Notes:
 
 If the server terminates TLS, set `'tls' => true` (and `'verify' => false` for self-signed) in
 `config.php`.
+
+### Alternative: rust-litecoin/electrs-ltc
+
+`rust-litecoin/electrs-ltc` (default branch `mempool`, a fork of `mempool/electrs`) is a
+first-class alternative to spesmilo/ElectrumX for serving the address index over the Electrum
+protocol - it is the Rust indexer behind litecoinspace.org. It builds its own index from
+litecoind's block files and exposes a plaintext Electrum-RPC endpoint on `127.0.0.1:50001`,
+matching our client's `electrum.port=50001`, `tls=false`. Package `mempool-electrs` (v3.4.0-dev);
+the produced binary is named `electrs`. The explorer only uses standard scripthash methods, so it
+is a drop-in either way.
+
+MWEB note: build from a current `mempool`-branch checkout. MWEB block/HogEx parsing comes through
+the `litecoin` (rust-litecoin) crate this fork pins in `Cargo.toml`
+(`bitcoin = { package = "litecoin", version = "0.32.8-rc.1", features = ["serde"] }`), wired in by
+its 2026-05-18 switch to that crate; it is automatic, with no MWEB opt-in flag. Older builds - or
+the archived `electrs-ltc-archive`, which used stock `rust-bitcoin` - panic on MWEB blocks; that is
+the panic the earlier note in this section warns about.
+
+Index compatibility: this fork's DB is incompatible with both `romanz/electrs` and upstream
+`mempool/electrs`, and must be reindexed from scratch.
+
+#### Build
+
+Prerequisites: Rust toolchain, a running litecoind, and `clang` + `cmake` (to build the bundled
+rust-rocksdb). No `txindex` is required by electrs itself; our litecoind runs `txindex=1`, which is
+harmless.
+
+```sh
+# Debian/Ubuntu build deps
+sudo apt install clang cmake
+
+git clone https://github.com/rust-litecoin/electrs-ltc && cd electrs-ltc
+git checkout mempool        # 'mempool' is already the default branch
+
+# compile-only build (first clean build takes a while); binary at target/release/electrs
+cargo build --release
+```
+
+#### Run (wired to litecoind)
+
+Network defaults to `mainnet`, so on LTC mainnet the Electrum port (`50001`) and daemon RPC port
+(`9332`) are already the per-network defaults and could be omitted; they are shown explicitly below
+for clarity. The DB is written under `<db-dir>/mainnet`.
+
+```sh
+target/release/electrs -vvvv --network mainnet \
+  --daemon-dir /home/<ltc-user>/.litecoin \
+  --daemon-rpc-addr 127.0.0.1:9332 \
+  --electrum-rpc-addr 127.0.0.1:50001 \
+  --http-addr 127.0.0.1:3000 \
+  --db-dir /var/lib/electrs-ltc/db \
+  --cookie "USER:PASSWORD"     # omit to auto-read <daemon-dir>/.cookie
+```
+
+Flag reference (from `src/config.rs`):
+
+- `--network mainnet` - LTC mainnet (internally `Network::Bitcoin`). Accepted: `mainnet`,
+  `testnet`, `testnet4`, `regtest`, `signet`.
+- `--electrum-rpc-addr 127.0.0.1:50001` - Electrum JSONRPC listen addr; `50001` is the LTC-mainnet
+  default. Plaintext, no TLS (matches `electrum.tls=false`).
+- `--daemon-rpc-addr 127.0.0.1:9332` - litecoind JSONRPC; `9332` is the LTC-mainnet default.
+- `--daemon-dir` - litecoind data directory (default `~/.litecoin/`); used to locate the blocks and
+  the cookie file.
+- `--cookie "USER:PASSWORD"` - inline JSONRPC auth. If omitted, electrs reads `<daemon-dir>/.cookie`.
+- `--blocks-dir` - raw block files (`blk*.dat`) dir; defaults to `<daemon-dir>/blocks/` (derived
+  from `--daemon-dir`, so it follows a non-default data dir automatically).
+- `--http-addr 127.0.0.1:3000` - optional esplora REST API; not needed by our client, which talks
+  Electrum on `50001`.
+- `--db-dir` - index DB location (default `./db`).
+- `--monitoring-addr` - optional Prometheus endpoint (default `127.0.0.1:4224` on mainnet).
+
+Do not set `--magic` for standard LTC mainnet; the network magic is derived in-crate from the
+litecoin genesis.
+
+#### systemd unit
+
+```ini
+# /etc/systemd/system/electrs-ltc.service
+[Unit]
+Description=electrs-ltc (Electrum server for litecoind)
+After=network.target litecoind.service
+Wants=litecoind.service
+
+[Service]
+Type=simple
+User=<electrs-user>
+ExecStart=/opt/electrs-ltc/target/release/electrs -vvvv --network mainnet \
+  --daemon-dir /home/<ltc-user>/.litecoin \
+  --daemon-rpc-addr 127.0.0.1:9332 \
+  --electrum-rpc-addr 127.0.0.1:50001 \
+  --db-dir /var/lib/electrs-ltc/db
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The `<electrs-user>` must be able to read litecoind's `.cookie` (or pass `--cookie "USER:PASSWORD"`
+in `ExecStart`) and, because `--blocks-dir` defaults to `<daemon-dir>/blocks/`, must also be able
+to read `/home/<ltc-user>/.litecoin/blocks/`.
+
+#### Storage and sync
+
+The full index needs about 1.3TB after compaction (as of October 2023), with roughly double that
+free during compaction; `--lightmode` cuts the on-disk footprint substantially. The README's only
+sync-time guidance is that creating the indexes "should take a few hours on a beefy machine with
+high speed NVMe SSD(s)", and litecoind must be fully synced first. Once synced, no client change is
+needed: the explorer's `electrum.port=50001` / `electrum.tls=false` config points straight at this
+endpoint.
 
 ## 3. The app
 
@@ -305,8 +419,10 @@ running, which ticks it every ~5 s.
 The **block audit** (the "Template audit" card on each block: predicted-vs-mined transactions)
 snapshots the fee-ordered next-block template into `db/audit.sqlite` (created automatically beside
 the cache DB; best-effort, no config) and diffs each newly-confirmed block against the snapshot
-taken while it was pending. Snapshots self-prune after 48h, audits after 30 days. Both the full
-5-minute run and the `--tick` timer drive it; running the tick is what makes coverage complete.
+taken while it was pending. The `mempool_snap` scratch self-prunes after 48h; audit result rows are
+kept indefinitely (tiny per-block counts), and only the bulky ~256 KB template blob is stripped from
+rows older than 48h. Both the full 5-minute run and the `--tick` timer drive it; running the tick is
+what makes coverage complete.
 
 Finally, the cron fills the **block-economics index** (`db/blockindex.sqlite`) that backs the
 mining timeseries endpoints (`/api/v1/mining/blocks/fees|rewards|fee-rates|sizes-weights/:period`,
