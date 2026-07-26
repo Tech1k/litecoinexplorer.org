@@ -113,7 +113,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
         <div class="blk-fee" style="color:<?= h($bc) ?>"><?= h(number_format($b['med_feerate'], 1)) ?> <span class="blk-unit">sat/vB</span></div>
         <?php if ($b['max_feerate'] > $b['min_feerate']): ?><div class="blk-range"><?= h(number_format($b['min_feerate'], 1)) ?>-<?= h(number_format($b['max_feerate'], 1)) ?></div><?php endif; ?>
         <div class="blk-meta"><?= commas($b['txs']) ?> tx · <?= h(ts_size_str((int) $b['size'], 'B')) ?></div>
-        <div class="blk-age"><?= h(time_ago($b['time'])) ?></div>
+        <div class="blk-age" data-time="<?= (int) $b['time'] ?>"><?= h(time_ago($b['time'])) ?></div>
       </a>
       <?php endforeach; ?>
     </div>
@@ -250,7 +250,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
             <td><a href="<?= h(ts_block_href($net, $b['id'])) ?>"><?= commas($b['height']) ?></a></td>
             <td class="mono"><a class="addr" href="<?= h(ts_block_href($net, $b['id'])) ?>"><?= h(shorten($b['id'], 8, 6)) ?></a></td>
             <td class="amt"><?= commas($b['tx_count']) ?></td>
-            <td class="amt age" data-sort="<?= (int) $b['timestamp'] ?>"><?= h(time_ago($b['timestamp'])) ?></td>
+            <td class="amt age" data-sort="<?= (int) $b['timestamp'] ?>" data-time="<?= (int) $b['timestamp'] ?>"><?= h(time_ago($b['timestamp'])) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>

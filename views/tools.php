@@ -76,11 +76,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 
 <div class="section-h">Transactions</div>
 
-<div class="card">
+<div class="card" id="tool-broadcast">
   <div class="card-h">Broadcast transaction</div>
   <div class="card-b">
     <p class="muted sub">Push a signed raw transaction (hex) to <?= h($net['label']) ?> via <span class="mono">POST /tx</span>.</p>
-    <form method="post" action="<?= h($base) ?>/broadcast">
+    <form method="post" action="<?= h($base) ?>/broadcast#tool-broadcast">
       <textarea name="rawtx" rows="3" placeholder="0200000001..." spellcheck="false" autocomplete="off"><?= $action === 'broadcast' ? h($rawtx) : '' ?></textarea>
       <div class="row mt-2"><button class="btn" type="submit">Broadcast</button></div>
     </form>
@@ -91,11 +91,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="tool-test">
   <div class="card-h">Test transaction <span class="sub">dry-run</span></div>
   <div class="card-b">
     <p class="muted sub">Check whether a signed raw transaction would be accepted into the mempool, via <span class="mono">testmempoolaccept</span>, <b>without</b> broadcasting it.</p>
-    <form method="post" action="<?= h($base) ?>/test">
+    <form method="post" action="<?= h($base) ?>/test#tool-test">
       <textarea name="rawtx" rows="3" placeholder="0200000001..." spellcheck="false" autocomplete="off"><?= $action === 'test' ? h($rawtx) : '' ?></textarea>
       <div class="row mt-2">
         <input type="text" name="maxfee" inputmode="decimal" placeholder="max fee rate sat/vB (optional)" style="max-width:230px" value="<?= $action === 'test' ? h($_POST['maxfee'] ?? '') : '' ?>" spellcheck="false" autocomplete="off">
@@ -112,11 +112,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="tool-decode">
   <div class="card-h">Decode transaction</div>
   <div class="card-b">
     <p class="muted sub">Decode raw transaction hex without broadcasting. Known inputs are resolved to show amounts and fee.</p>
-    <form method="post" action="<?= h($base) ?>/decode">
+    <form method="post" action="<?= h($base) ?>/decode#tool-decode">
       <textarea name="rawtx" rows="3" placeholder="0200000001..." spellcheck="false" autocomplete="off"><?= $action === 'decode' ? h($rawtx) : '' ?></textarea>
       <div class="row mt-2"><button class="btn" type="submit">Decode</button></div>
     </form>
@@ -178,11 +178,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 
 <div class="section-h">Scripts &amp; PSBTs</div>
 
-<div class="card">
+<div class="card" id="tool-script">
   <div class="card-h">Decode script</div>
   <div class="card-b">
     <p class="muted sub">Disassemble a scriptPubKey / redeemScript / witnessScript and see its type and the p2sh/p2wsh addresses it hashes to on this network.</p>
-    <form method="post" action="<?= h($base) ?>/script">
+    <form method="post" action="<?= h($base) ?>/script#tool-script">
       <textarea name="hex" rows="2" placeholder="76a914...88ac" spellcheck="false" autocomplete="off"><?= $action === 'script' ? h($_POST['hex'] ?? '') : '' ?></textarea>
       <div class="row mt-2"><button class="btn" type="submit">Decode script</button></div>
     </form>
@@ -201,11 +201,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="tool-psbt">
   <div class="card-h">Inspect PSBT</div>
   <div class="card-b">
     <p class="muted sub">Decode a base64 PSBT: per-input prevout amounts, fee, signing progress, and whether it is finalized.</p>
-    <form method="post" action="<?= h($base) ?>/psbt">
+    <form method="post" action="<?= h($base) ?>/psbt#tool-psbt">
       <textarea name="psbt" rows="3" placeholder="cHNidP8B..." spellcheck="false" autocomplete="off"><?= $action === 'psbt' ? h($_POST['psbt'] ?? '') : '' ?></textarea>
       <div class="row mt-2"><button class="btn" type="submit">Inspect</button></div>
     </form>
@@ -235,11 +235,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 
 <div class="section-h">Encoding &amp; messages</div>
 
-<div class="card">
+<div class="card" id="tool-opreturn">
   <div class="card-h">Encode OP_RETURN</div>
   <div class="card-b">
     <p class="muted sub">Turn text or hex into an OP_RETURN scriptPubKey to embed in a transaction.</p>
-    <form method="post" action="<?= h($base) ?>/opreturn">
+    <form method="post" action="<?= h($base) ?>/opreturn#tool-opreturn">
       <textarea name="data" rows="2" placeholder="hello world" spellcheck="false"><?= $action === 'opreturn' ? h($_POST['data'] ?? '') : '' ?></textarea>
       <div class="row mt-2">
         <label class="muted sub"><input type="radio" name="fmt" value="text" <?= ($_POST['fmt'] ?? 'text') !== 'hex' ? 'checked' : '' ?>> text</label>
@@ -258,11 +258,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
   </div>
 </div>
 
-<div class="card">
+<div class="card" id="tool-verifymsg">
   <div class="card-h">Verify signed message</div>
   <div class="card-b">
     <p class="muted sub">Verify a message signed by a legacy (m/n...) address. BIP-322 (segwit/taproot) is not supported by the node.</p>
-    <form method="post" action="<?= h($base) ?>/verifymsg">
+    <form method="post" action="<?= h($base) ?>/verifymsg#tool-verifymsg">
       <label class="fld">Address</label>
       <input type="text" name="addr" value="<?= $action === 'verifymsg' ? h($_POST['addr'] ?? '') : '' ?>" spellcheck="false" autocomplete="off">
       <label class="fld mt-2">Signature (base64)</label>

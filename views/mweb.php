@@ -127,11 +127,11 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 </div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card" id="pegcheck">
   <div class="card-h"><span><?= ts_icon('eye-off') ?>Peg-out privacy check</span> <span class="sub">anonymity-set lookup</span></div>
   <div class="card-b">
     <p class="muted sub">How well does a peg-out amount blend in? A common, round amount hides in a larger anonymity set; an exact or unusual amount is easier to link back to its peg-in.</p>
-    <form method="get" action="<?= h($base) ?>/mweb">
+    <form method="get" action="<?= h($base) ?>/mweb#pegcheck">
       <div class="row">
         <input type="text" name="privacy_amount" inputmode="decimal" placeholder="amount in <?= h($net['unit']) ?> (e.g. 1.5)" value="<?= h($mwPrivAmt) ?>" style="max-width:240px" spellcheck="false" autocomplete="off">
         <button class="btn" type="submit">Check</button>

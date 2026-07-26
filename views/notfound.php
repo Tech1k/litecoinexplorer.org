@@ -67,6 +67,6 @@ if (is_array($net)) {
 </div></div>
 </main>
 <?php ts_footer(); ?>
-<script src="/assets/app.js?v=22" defer></script>
+<script src="/assets/app.js?v=23" defer></script>
 </body></html><?php
 }

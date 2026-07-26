@@ -41,6 +41,28 @@
   function commas(n) { return Number(n).toLocaleString(); }
   function sizeStr(n) { n = n || 0; if (n >= 1e6) { return (n / 1e6).toFixed(2) + ' MB'; } if (n >= 1000) { return (n / 1000).toFixed(1) + ' kB'; } return n + ' B'; }
 
+  // Keep relative "N ago" labels fresh. Server stamps them once at page load, so without
+  // this they freeze - and live-inserted blocks would sit on "just now" forever. Any element
+  // with data-time="<unix secs>" is re-rendered every 10s. Format mirrors PHP time_ago().
+  function timeAgo(ts) {
+    var d = Math.floor(Date.now() / 1000) - ts;
+    if (d < 0) { d = 0; }
+    if (d < 60) { return d + ' sec ago'; }
+    if (d < 3600) { return Math.floor(d / 60) + ' min ago'; }
+    if (d < 86400) { return Math.floor(d / 3600) + ' hr ago'; }
+    var days = Math.floor(d / 86400);
+    return days + ' day' + (d < 172800 ? '' : 's') + ' ago';
+  }
+  function tickAges() {
+    var els = document.querySelectorAll('[data-time]');
+    for (var i = 0; i < els.length; i++) {
+      var ts = parseInt(els[i].getAttribute('data-time'), 10);
+      if (ts) { els[i].textContent = timeAgo(ts); }
+    }
+  }
+  tickAges();
+  setInterval(tickAges, 10000);
+
   // Live chain tip: poll the tip block and update the number + hash together.
   var tip = document.getElementById('live-tip');
   if (tip && tip.dataset.tip) {
@@ -64,11 +86,13 @@
               a.className = 'blk conf newblk';
               a.style.borderTopColor = 'var(--accent)';
               a.href = uiBase + '/block/' + b.id;
+              var bts = parseInt(b.timestamp, 10) || Math.floor(Date.now() / 1000);
               a.innerHTML = '<div class="blk-h">#' + commas(b.height) + '</div>' +
                 '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
-                '<div class="blk-age">just now</div>';
+                '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
               var firstConf = strip.querySelector('.blk.conf');
               if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
+              tickAges();
             }
           }
         }

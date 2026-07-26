@@ -232,7 +232,7 @@ function ts_foot(array $net, array $opt = []): void
 </main>
 <?php if (empty($opt['chromeless'])) { ts_footer(); } ?>
 <?php if (!empty($opt['qr'])): ?><script src="/assets/qrcode.js?v=1" defer></script><?php endif; ?>
-<script src="/assets/app.js?v=22" defer></script>
+<script src="/assets/app.js?v=23" defer></script>
 </body>
 </html>
 <?php
