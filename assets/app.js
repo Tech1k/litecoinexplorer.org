@@ -90,42 +90,42 @@
             var strip = document.getElementById('blocks-strip');
             if (strip && b.id) {
               var bts = parseInt(b.timestamp, 10) || Math.floor(Date.now() / 1000);
-              var addCard = function (ext) {
-                var a = document.createElement('a');
-                a.className = 'blk conf newblk';
-                a.href = uiBase + '/block/' + b.id;
-                var med = ext && ext.extras ? parseFloat(ext.extras.medianFee) : NaN;
-                var fr = ext && ext.extras ? ext.extras.feeRange : null;
-                var html = '<div class="blk-h">#' + commas(b.height) + '</div>';
-                if (isFinite(med) && med > 0) {
-                  var col = feerateColor(med);
-                  a.style.borderTopColor = col;
-                  html += '<div class="blk-fee" style="color:' + col + '">' + med.toFixed(1) +
-                    ' <span class="blk-unit">sat/vB</span></div>';
-                  if (fr && fr.length >= 3 && fr[2] > fr[0]) {
-                    html += '<div class="blk-range">' + fr[0].toFixed(1) + '-' + fr[2].toFixed(1) + '</div>';
-                  }
-                } else {
-                  a.style.borderTopColor = 'var(--accent)';
-                }
-                html += '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
-                  '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
-                a.innerHTML = html;
-                var firstConf = strip.querySelector('.blk.conf');
-                if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
-                tickAges();
-              };
-              // Pull the new block's fee stats so the live card matches the server-rendered
-              // strip (fee rate + range + colour); fall back to a fee-less card on failure.
+              // Insert the card immediately (fee-less, accent border) so it ALWAYS appears even
+              // if the stats fetch stalls; the age ticks via data-time regardless.
+              var a = document.createElement('a');
+              a.className = 'blk conf newblk';
+              a.href = uiBase + '/block/' + b.id;
+              a.style.borderTopColor = 'var(--accent)';
+              a.innerHTML = '<div class="blk-h">#' + commas(b.height) + '</div>' +
+                '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
+                '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
+              var firstConf = strip.querySelector('.blk.conf');
+              if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
+              tickAges();
+              // Enrich with fee rate + range + feerate colour to match the server strip. Match
+              // by HASH only (a height match could bind a reorg sibling). Mirror the server:
+              // show the fee line whenever stats exist (incl. 0.0), range only when max > min.
               fetch(uiBase + '/api/v1/blocks').then(function (r) { return r.json(); }).then(function (list) {
                 var ext = null;
                 if (Array.isArray(list)) {
                   for (var i = 0; i < list.length; i++) {
-                    if (list[i] && (list[i].id === b.id || list[i].height === b.height)) { ext = list[i]; break; }
+                    if (list[i] && list[i].id === b.id) { ext = list[i]; break; }
                   }
                 }
-                addCard(ext);
-              }).catch(function () { addCard(null); });
+                if (!ext || !ext.extras) { return; }
+                var med = parseFloat(ext.extras.medianFee);
+                if (!isFinite(med)) { return; }
+                var fr = ext.extras.feeRange;
+                var col = feerateColor(med);
+                a.style.borderTopColor = col;
+                var feeHtml = '<div class="blk-fee" style="color:' + col + '">' + med.toFixed(1) +
+                  ' <span class="blk-unit">sat/vB</span></div>';
+                if (fr && fr.length >= 3 && fr[2] > fr[0]) {
+                  feeHtml += '<div class="blk-range">' + fr[0].toFixed(1) + '-' + fr[2].toFixed(1) + '</div>';
+                }
+                var hEl = a.querySelector('.blk-h');
+                if (hEl) { hEl.insertAdjacentHTML('afterend', feeHtml); }
+              }).catch(function () {});
             }
           }
         }

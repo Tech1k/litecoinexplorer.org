@@ -67,6 +67,6 @@ if (is_array($net)) {
 </div></div>
 </main>
 <?php lx_footer(); ?>
-<script src="/assets/app.js?v=25" defer></script>
+<script src="/assets/app.js?v=26" defer></script>
 </body></html><?php
 }

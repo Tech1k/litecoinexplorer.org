@@ -232,7 +232,7 @@ function lx_foot(array $net, array $opt = []): void
 </main>
 <?php if (empty($opt['chromeless'])) { lx_footer(); } ?>
 <?php if (!empty($opt['qr'])): ?><script src="/assets/qrcode.js?v=1" defer></script><?php endif; ?>
-<script src="/assets/app.js?v=25" defer></script>
+<script src="/assets/app.js?v=26" defer></script>
 </body>
 </html>
 <?php
