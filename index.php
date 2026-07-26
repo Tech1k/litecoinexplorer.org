@@ -678,6 +678,7 @@ function lx_route_api(array $net, array $r, string $method): void
                 json_out(lx_backend_info_api($net), 200, 60);
             }
             if (($r[1] ?? '') === 'transaction-times') {
+                if (function_exists('lx_rate_limit') && !lx_rate_limit('transaction_times', 60, 60)) { api_error('rate limited', 429); }
                 json_out(lx_transaction_times_api($net), 200, 5);
             }
             if (($r[1] ?? '') === 'fullrbf' && ($r[2] ?? '') === 'replacements') {
@@ -685,6 +686,7 @@ function lx_route_api(array $net, array $r, string $method): void
             }
             if (($r[1] ?? '') === 'cpfp') {
                 if (!is_txid($r[2] ?? '')) { api_error('Invalid txid', 400); }
+                if (function_exists('lx_rate_limit') && !lx_rate_limit('cpfp', 120, 60)) { api_error('rate limited', 429); }
                 json_out(lx_cpfp_api($net, $r[2]), 200, 5);
             }
             if (($r[1] ?? '') === 'tx' && ($r[3] ?? '') === 'rbf') {

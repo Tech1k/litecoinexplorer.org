@@ -160,6 +160,9 @@ function lx_blockindex_tick(array $net, ?int $maxPerRun = null): int
     }
     try {
         $db->prepare('DELETE FROM block_index WHERE net = ? AND height < ?')->execute([$net['slug'], $floor]);
+        // Clear rows stranded ABOVE the tip (a chain shrink / deep reorg can leave the tip
+        // lower than a previously-indexed height); the forward-fill only ever adds up to tip.
+        $db->prepare('DELETE FROM block_index WHERE net = ? AND height > ?')->execute([$net['slug'], $tip]);
     } catch (Throwable $e) {
     }
     return $done;
