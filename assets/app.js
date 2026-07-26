@@ -86,45 +86,50 @@
           tip.textContent = '#' + commas(b.height);
           if (hashEl && b.id) { hashEl.textContent = b.id; hashEl.setAttribute('href', uiBase + '/block/' + b.id); }
           if (b.height > lastH) {
-            lastH = b.height; flash(tip);
+            flash(tip);
             var strip = document.getElementById('blocks-strip');
-            if (strip && b.id) {
-              var bts = parseInt(b.timestamp, 10) || Math.floor(Date.now() / 1000);
-              // Insert the card immediately (fee-less, accent border) so it ALWAYS appears even
-              // if the stats fetch stalls; the age ticks via data-time regardless.
-              var a = document.createElement('a');
-              a.className = 'blk conf newblk';
-              a.href = uiBase + '/block/' + b.id;
-              a.style.borderTopColor = 'var(--accent)';
-              a.innerHTML = '<div class="blk-h">#' + commas(b.height) + '</div>' +
-                '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
-                '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
-              var firstConf = strip.querySelector('.blk.conf');
-              if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
-              tickAges();
-              // Enrich with fee rate + range + feerate colour to match the server strip. Match
-              // by HASH only (a height match could bind a reorg sibling). Mirror the server:
-              // show the fee line whenever stats exist (incl. 0.0), range only when max > min.
+            if (strip) {
+              // A 20s poll can span more than one block, so don't just add the tip (that skips
+              // intermediates and leaves gaps). Fetch the recent list (which carries fee extras)
+              // and prepend EVERY block newer than what's shown, each as a full card matching the
+              // server strip. lastH only advances to blocks actually inserted, so a not-yet-listed
+              // tip (edge-cache lag) is retried next poll instead of being lost.
               fetch(uiBase + '/api/v1/blocks').then(function (r) { return r.json(); }).then(function (list) {
-                var ext = null;
-                if (Array.isArray(list)) {
-                  for (var i = 0; i < list.length; i++) {
-                    if (list[i] && list[i].id === b.id) { ext = list[i]; break; }
+                if (!Array.isArray(list)) { return; }
+                var fresh = [];
+                for (var i = 0; i < list.length; i++) {
+                  var e = list[i];
+                  if (e && e.id && typeof e.height === 'number' && e.height > lastH) { fresh.push(e); }
+                }
+                fresh.sort(function (x, y) { return x.height - y.height; });   // oldest first -> newest ends leftmost
+                for (var j = 0; j < fresh.length; j++) {
+                  var blk = fresh[j];
+                  var a = document.createElement('a');
+                  a.className = 'blk conf newblk';
+                  a.href = uiBase + '/block/' + blk.id;
+                  var bts = parseInt(blk.timestamp, 10) || Math.floor(Date.now() / 1000);
+                  var med = blk.extras ? parseFloat(blk.extras.medianFee) : NaN;
+                  var html = '<div class="blk-h">#' + commas(blk.height) + '</div>';
+                  if (isFinite(med)) {
+                    var col = feerateColor(med);
+                    a.style.borderTopColor = col;
+                    html += '<div class="blk-fee" style="color:' + col + '">' + med.toFixed(1) +
+                      ' <span class="blk-unit">sat/vB</span></div>';
+                    var fr = blk.extras.feeRange;
+                    if (fr && fr.length >= 3 && fr[2] > fr[0]) {
+                      html += '<div class="blk-range">' + fr[0].toFixed(1) + '-' + fr[2].toFixed(1) + '</div>';
+                    }
+                  } else {
+                    a.style.borderTopColor = 'var(--accent)';
                   }
+                  html += '<div class="blk-meta">' + commas(blk.tx_count || 0) + ' tx · ' + sizeStr(blk.size || 0) + '</div>' +
+                    '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
+                  a.innerHTML = html;
+                  var firstConf = strip.querySelector('.blk.conf');
+                  if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
+                  lastH = blk.height;
                 }
-                if (!ext || !ext.extras) { return; }
-                var med = parseFloat(ext.extras.medianFee);
-                if (!isFinite(med)) { return; }
-                var fr = ext.extras.feeRange;
-                var col = feerateColor(med);
-                a.style.borderTopColor = col;
-                var feeHtml = '<div class="blk-fee" style="color:' + col + '">' + med.toFixed(1) +
-                  ' <span class="blk-unit">sat/vB</span></div>';
-                if (fr && fr.length >= 3 && fr[2] > fr[0]) {
-                  feeHtml += '<div class="blk-range">' + fr[0].toFixed(1) + '-' + fr[2].toFixed(1) + '</div>';
-                }
-                var hEl = a.querySelector('.blk-h');
-                if (hEl) { hEl.insertAdjacentHTML('afterend', feeHtml); }
+                if (fresh.length) { tickAges(); }
               }).catch(function () {});
             }
           }
