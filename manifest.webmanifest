@@ -1,7 +1,7 @@
 {
   "name": "Litecoin Explorer",
   "short_name": "Litecoin Explorer",
-  "description": "Litecoin (LTC) block explorer with MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.",
+  "description": "Litecoin (LTC) block explorer with first-class MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -89,7 +89,7 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 <?php if ($mwOn): ?>
 <?php if (is_array($mwStats) && isset($mwStats['stats'])): $S = $mwStats['stats']; ?>
 <div class="card">
-  <div class="card-h"><span><?= lx_icon('shield') ?>MWEB intelligence</span> <span class="sub">via MWEBscan<?php $fr = lx_mwebscan_freshness($mwStats); if ($fr !== ''): ?> &middot; <?= h($fr) ?><?php endif; ?></span></div>
+  <div class="card-h"><span><?= lx_icon('shield') ?>MWEB analysis</span> <span class="sub">via MWEBscan<?php $fr = lx_mwebscan_freshness($mwStats); if ($fr !== ''): ?> &middot; <?= h($fr) ?><?php endif; ?></span></div>
   <div class="card-b">
     <div class="stat-grid">
       <div class="stat"><div class="muted sub"><?= lx_icon('log-in') ?>Peg-ins</div><div class="big-num sm"><?= commas((int) ($S['total_pegins'] ?? 0)) ?></div><div class="muted sub">all-time</div></div>

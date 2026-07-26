@@ -1,10 +1,10 @@
 /* Litecoin Explorer service worker: offline app shell + static-asset caching.
    Chain data (/api, pages) stays network-first so it is never stale.
    SPDX-License-Identifier: AGPL-3.0-or-later */
-const VERSION = 'lx-v52';
+const VERSION = 'lx-v53';
 const SHELL = [
   '/assets/app.css?v=46',
-  '/assets/app.js?v=24',
+  '/assets/app.js?v=25',
   '/assets/qrcode.js?v=1',
   '/assets/theme-init.js?v=2',
   '/assets/favicon.svg',

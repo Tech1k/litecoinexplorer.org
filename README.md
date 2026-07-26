@@ -1,7 +1,7 @@
 # Litecoin Explorer
 
-**Litecoin, block by block.** A self-hosted **Litecoin block explorer with first-class
-MWEB integration, powered by [MWEBscan](https://mwebscan.com)**. It serves blocks, transactions,
+**Litecoin, block by block.** A self-hosted **Litecoin block explorer with first-class MWEB support** and an
+optional [MWEBscan](https://mwebscan.com) analysis overlay. It serves blocks, transactions,
 addresses, the mempool, mining and fees from your own node, plus Litecoin's MWEB peg-in/peg-out
 tracking and supply, enriched with MWEBscan's analysis overlay (round-trip linking, privacy
 scoring, entity attribution).

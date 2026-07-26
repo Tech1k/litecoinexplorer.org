@@ -106,7 +106,7 @@ If the server terminates TLS, set `'tls' => true` (and `'verify' => false` for s
 ### Alternative: rust-litecoin/electrs-ltc
 
 `rust-litecoin/electrs-ltc` (default branch `mempool`, a fork of `mempool/electrs`) is a
-first-class alternative to spesmilo/ElectrumX for serving the address index over the Electrum
+drop-in alternative to spesmilo/ElectrumX for serving the address index over the Electrum
 protocol - it is the Rust indexer behind litecoinspace.org. It builds its own index from
 litecoind's block files and exposes a plaintext Electrum-RPC endpoint on `127.0.0.1:50001`,
 matching our client's `electrum.port=50001`, `tls=false`. Package `mempool-electrs` (v3.4.0-dev);

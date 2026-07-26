@@ -124,7 +124,7 @@ function lx_head(array $net, array $opt = []): void
     $title = $opt['title'] ?? ($net['label'] . ' Explorer');
     $chromeless = !empty($opt['chromeless']);   // TV / wall-display mode: no nav or footer
     $desc  = $opt['desc'] ?? ($net['label']
-        . ' block explorer with MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.');
+        . ' block explorer with first-class MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.');
     $ogImage = $opt['og_image'] ?? 'og-banner.png';   // dynamic /og/... card or the static banner
     $base  = lx_u($net);
     // Canonical points at the clean resource path, no query string (avoids
@@ -232,7 +232,7 @@ function lx_foot(array $net, array $opt = []): void
 </main>
 <?php if (empty($opt['chromeless'])) { lx_footer(); } ?>
 <?php if (!empty($opt['qr'])): ?><script src="/assets/qrcode.js?v=1" defer></script><?php endif; ?>
-<script src="/assets/app.js?v=24" defer></script>
+<script src="/assets/app.js?v=25" defer></script>
 </body>
 </html>
 <?php

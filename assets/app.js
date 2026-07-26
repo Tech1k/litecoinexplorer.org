@@ -40,6 +40,13 @@
 
   function commas(n) { return Number(n).toLocaleString(); }
   function sizeStr(n) { n = n || 0; if (n >= 1e6) { return (n / 1e6).toFixed(2) + ' MB'; } if (n >= 1000) { return (n / 1000).toFixed(1) + ' kB'; } return n + ' B'; }
+  // Fee-rate colour: log scale, green (low) -> red (high). Mirrors PHP lx_feerate_color().
+  function feerateColor(rate) {
+    if (rate < 0.1) { rate = 0.1; }
+    var t = Math.log(rate + 1) / Math.log(80);
+    if (t < 0) { t = 0; } if (t > 1) { t = 1; }
+    return 'hsl(' + Math.round(145 - 145 * t) + ', 68%, 50%)';
+  }
 
   // Keep relative "N ago" labels fresh. Server stamps them once at page load, so without
   // this they freeze - and live-inserted blocks would sit on "just now" forever. Any element
@@ -82,17 +89,43 @@
             lastH = b.height; flash(tip);
             var strip = document.getElementById('blocks-strip');
             if (strip && b.id) {
-              var a = document.createElement('a');
-              a.className = 'blk conf newblk';
-              a.style.borderTopColor = 'var(--accent)';
-              a.href = uiBase + '/block/' + b.id;
               var bts = parseInt(b.timestamp, 10) || Math.floor(Date.now() / 1000);
-              a.innerHTML = '<div class="blk-h">#' + commas(b.height) + '</div>' +
-                '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
-                '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
-              var firstConf = strip.querySelector('.blk.conf');
-              if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
-              tickAges();
+              var addCard = function (ext) {
+                var a = document.createElement('a');
+                a.className = 'blk conf newblk';
+                a.href = uiBase + '/block/' + b.id;
+                var med = ext && ext.extras ? parseFloat(ext.extras.medianFee) : NaN;
+                var fr = ext && ext.extras ? ext.extras.feeRange : null;
+                var html = '<div class="blk-h">#' + commas(b.height) + '</div>';
+                if (isFinite(med) && med > 0) {
+                  var col = feerateColor(med);
+                  a.style.borderTopColor = col;
+                  html += '<div class="blk-fee" style="color:' + col + '">' + med.toFixed(1) +
+                    ' <span class="blk-unit">sat/vB</span></div>';
+                  if (fr && fr.length >= 3 && fr[2] > fr[0]) {
+                    html += '<div class="blk-range">' + fr[0].toFixed(1) + '-' + fr[2].toFixed(1) + '</div>';
+                  }
+                } else {
+                  a.style.borderTopColor = 'var(--accent)';
+                }
+                html += '<div class="blk-meta">' + commas(b.tx_count || 0) + ' tx · ' + sizeStr(b.size || 0) + '</div>' +
+                  '<div class="blk-age" data-time="' + bts + '">' + timeAgo(bts) + '</div>';
+                a.innerHTML = html;
+                var firstConf = strip.querySelector('.blk.conf');
+                if (firstConf) { strip.insertBefore(a, firstConf); } else { strip.appendChild(a); }
+                tickAges();
+              };
+              // Pull the new block's fee stats so the live card matches the server-rendered
+              // strip (fee rate + range + colour); fall back to a fee-less card on failure.
+              fetch(uiBase + '/api/v1/blocks').then(function (r) { return r.json(); }).then(function (list) {
+                var ext = null;
+                if (Array.isArray(list)) {
+                  for (var i = 0; i < list.length; i++) {
+                    if (list[i] && (list[i].id === b.id || list[i].height === b.height)) { ext = list[i]; break; }
+                  }
+                }
+                addCard(ext);
+              }).catch(function () { addCard(null); });
             }
           }
         }
