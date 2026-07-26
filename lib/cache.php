@@ -10,13 +10,13 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-function ts_cache_pdo(): ?PDO
+function lx_cache_pdo(): ?PDO
 {
     static $pdo = false; // false = not yet tried, null = unavailable
     if ($pdo !== false) {
         return $pdo;
     }
-    $path = ts_config()['cache_db'] ?? null;
+    $path = lx_config()['cache_db'] ?? null;
     if (!$path) {
         return $pdo = null;
     }
@@ -52,7 +52,7 @@ function ts_cache_pdo(): ?PDO
 /** Get a cached string by key, or null if missing/expired. */
 function cache_get(string $key): ?string
 {
-    $db = ts_cache_pdo();
+    $db = lx_cache_pdo();
     if (!$db) {
         return null;
     }
@@ -75,7 +75,7 @@ function cache_get(string $key): ?string
 /** Store a string under key. ttl=0 means "immutable / never expire". */
 function cache_set(string $key, string $value, int $ttl = 0): void
 {
-    $db = ts_cache_pdo();
+    $db = lx_cache_pdo();
     if (!$db) {
         return;
     }
@@ -85,7 +85,7 @@ function cache_set(string $key, string $value, int $ttl = 0): void
             . 'ON CONFLICT(k) DO UPDATE SET v = excluded.v, exp = excluded.exp');
         $st->execute([$key, $value, $exp]);
         if (mt_rand(1, 1000) === 1) {   // ~0.1% of writes: keep the cache bounded
-            ts_cache_evict($db);
+            lx_cache_evict($db);
         }
     } catch (Throwable $e) {
         // ignore
@@ -93,7 +93,7 @@ function cache_set(string $key, string $value, int $ttl = 0): void
 }
 
 /** Drop expired rows and enforce a row cap (immutable bodies accumulate otherwise). */
-function ts_cache_evict(PDO $db): void
+function lx_cache_evict(PDO $db): void
 {
     try {
         $db->exec('DELETE FROM cache WHERE exp != 0 AND exp < ' . time());
@@ -140,13 +140,13 @@ function cache_remember(string $key, int $ttl, callable $producer)
  * what stops a direct caller from forging it. Deployments NOT behind Cloudflare
  * should set 'trust_cf_ip' => false so a spoofed header can't reset a bucket.
  */
-function ts_rate_limit(string $bucket, int $max, int $window): bool
+function lx_rate_limit(string $bucket, int $max, int $window): bool
 {
     if ($max < 1 || $window < 1) {
         return true;
     }
     $remote  = $_SERVER['REMOTE_ADDR'] ?? '';
-    $trustCf = ts_config()['trust_cf_ip'] ?? true;
+    $trustCf = lx_config()['trust_cf_ip'] ?? true;
     $ip = ($trustCf && !empty($_SERVER['HTTP_CF_CONNECTING_IP']))
         ? (string) $_SERVER['HTTP_CF_CONNECTING_IP']
         : $remote;

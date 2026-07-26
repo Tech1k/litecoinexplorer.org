@@ -11,7 +11,7 @@
  */
 
 /** Lower-case coinbase-tag substring -> canonical pool name. */
-function ts_pool_map(): array
+function lx_pool_map(): array
 {
     static $m = [
         'foundry'         => 'Foundry USA',
@@ -53,7 +53,7 @@ function ts_pool_map(): array
 }
 
 /** Printable-ASCII runs (>=3 chars) joined by spaces, from a coinbase scriptSig hex. */
-function ts_coinbase_ascii(string $hex): string
+function lx_coinbase_ascii(string $hex): string
 {
     $bin = @hex2bin($hex);
     if ($bin === false || $bin === '') {
@@ -82,7 +82,7 @@ function ts_coinbase_ascii(string $hex): string
  * 'Unknown'; tag = the raw extracted ASCII. Cached per block hash (immutable
  * once buried; short TTL near the tip for reorg safety).
  */
-function ts_block_pool(array $net, string $hash): array
+function lx_block_pool(array $net, string $hash): array
 {
     $ckey = 'pool:' . $net['slug'] . ':' . $hash;
     $hit  = cache_get($ckey);
@@ -91,18 +91,18 @@ function ts_block_pool(array $net, string $hash): array
         if (is_array($d)) { return $d; }
     }
     $unknown = ['pool' => null, 'label' => 'Unknown', 'tag' => ''];
-    $txids = ts_block_txids($net, $hash);
+    $txids = lx_block_txids($net, $hash);
     if (!$txids) {
         return $unknown;
     }
-    $cb = ts_esplora_tx($net, $txids[0], $hash);
+    $cb = lx_esplora_tx($net, $txids[0], $hash);
     if (!$cb || empty($cb['vin'][0]['is_coinbase'])) {
         return $unknown;
     }
-    $ascii = ts_coinbase_ascii($cb['vin'][0]['scriptsig'] ?? '');
+    $ascii = lx_coinbase_ascii($cb['vin'][0]['scriptsig'] ?? '');
     $lc = strtolower($ascii);
     $pool = null;
-    foreach (ts_pool_map() as $needle => $name) {
+    foreach (lx_pool_map() as $needle => $name) {
         if ($needle !== '' && strpos($lc, $needle) !== false) {
             $pool = $name;
             break;
@@ -130,8 +130,8 @@ function ts_block_pool(array $net, string $hash): array
             ? $best : 'Unknown';
     }
     $out = ['pool' => $pool, 'label' => $label, 'tag' => $ascii];
-    $h = ts_block_height_for_hash($net, $hash);
-    $depth = $h !== null ? ts_tip_height($net) - $h : 999;
+    $h = lx_block_height_for_hash($net, $hash);
+    $depth = $h !== null ? lx_tip_height($net) - $h : 999;
     cache_set($ckey, json_encode($out, JSON_UNESCAPED_SLASHES), $depth > 100 ? 0 : 600);
     return $out;
 }
@@ -141,17 +141,17 @@ function ts_block_pool(array $net, string $hash): array
  * pool/miner label. Returns ['window'=>int, 'pools'=>[['name','count','pct'],..]]
  * sorted by count desc. Cached ~2 min (per-block attribution is cached forever).
  */
-function ts_mining_distribution(array $net, int $window = 50): array
+function lx_mining_distribution(array $net, int $window = 50): array
 {
     $window = max(10, min(200, $window));
     return cache_remember('minedist:' . $net['slug'] . ':' . $window, 120, function () use ($net, $window) {
-        $tip = ts_tip_height($net);
+        $tip = lx_tip_height($net);
         $tally = [];
         $seen = 0;
         for ($h = $tip; $h > $tip - $window && $h >= 0; $h--) {
-            $hash = ts_block_hash_at($net, $h);
+            $hash = lx_block_hash_at($net, $h);
             if ($hash === null) { break; }
-            $p = ts_block_pool($net, $hash);
+            $p = lx_block_pool($net, $hash);
             $name = $p['label'];
             $tally[$name] = ($tally[$name] ?? 0) + 1;
             $seen++;
@@ -174,21 +174,21 @@ function ts_mining_distribution(array $net, int $window = 50): array
  * this is cheap after the distribution has been built. Returns a list of
  * ['height', 'hash', 'tag'].
  */
-function ts_pool_blocks(array $net, string $label, int $window = 100): array
+function lx_pool_blocks(array $net, string $label, int $window = 100): array
 {
     $window = max(10, min(300, $window));
     // Cache the window walk (per-block attribution is itself cached, so this is
     // mostly a re-tally) so repeated loads of a pool page don't re-walk each time.
     $key = 'poolblocks:' . $net['slug'] . ':' . $window . ':' . md5($label);
     $cached = cache_remember($key, 120, function () use ($net, $label, $window) {
-        $tip = ts_tip_height($net);
+        $tip = lx_tip_height($net);
         $out = [];
         for ($h = $tip; $h > $tip - $window && $h >= 0; $h--) {
-            $hash = ts_block_hash_at($net, $h);
+            $hash = lx_block_hash_at($net, $h);
             if ($hash === null) {
                 break;
             }
-            $p = ts_block_pool($net, $hash);
+            $p = lx_block_pool($net, $hash);
             if ($p['label'] === $label) {
                 $out[] = ['height' => $h, 'hash' => $hash, 'tag' => $p['tag']];
             }

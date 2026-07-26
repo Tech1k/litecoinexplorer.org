@@ -29,7 +29,7 @@ class RpcException extends RuntimeException
  * once with a fresh connection. A fresh handle failing is a real transport
  * error and is not retried. The handle is never closed within the request.
  */
-function ts_rpc_exec(array $rpc, string $payload, int $timeout): array
+function lx_rpc_exec(array $rpc, string $payload, int $timeout): array
 {
     static $handles = [];
     $url  = $rpc['url'];
@@ -75,7 +75,7 @@ function ts_rpc_exec(array $rpc, string $payload, int $timeout): array
 }
 
 /** Single JSON-RPC call. Throws RpcException on transport or RPC error. */
-function ts_rpc(array $net, string $method, array $params = [], ?int $timeout = null)
+function lx_rpc(array $net, string $method, array $params = [], ?int $timeout = null)
 {
     $rpc = $net['rpc'];
     $payload = json_encode([
@@ -87,7 +87,7 @@ function ts_rpc(array $net, string $method, array $params = [], ?int $timeout = 
 
     // A per-call $timeout overrides the config default - used by the cron-only
     // gettxoutsetinfo warmer, which needs minutes on a node without coinstatsindex.
-    list($http, $resp) = ts_rpc_exec($rpc, $payload, $timeout ?? (int) ($rpc['timeout'] ?? 25));
+    list($http, $resp) = lx_rpc_exec($rpc, $payload, $timeout ?? (int) ($rpc['timeout'] ?? 25));
 
     if ($http === 401) {
         throw new RpcException('Core RPC auth failed (check rpcuser/rpcpassword).');
@@ -105,11 +105,11 @@ function ts_rpc(array $net, string $method, array $params = [], ?int $timeout = 
     return $json['result'] ?? null;
 }
 
-/** Like ts_rpc but returns null instead of throwing on RPC error (not transport). */
-function ts_rpc_soft(array $net, string $method, array $params = [], ?int $timeout = null)
+/** Like lx_rpc but returns null instead of throwing on RPC error (not transport). */
+function lx_rpc_soft(array $net, string $method, array $params = [], ?int $timeout = null)
 {
     try {
-        return ts_rpc($net, $method, $params, $timeout);
+        return lx_rpc($net, $method, $params, $timeout);
     } catch (RpcException $e) {
         if ($e->rpcCode !== 0) {
             return null; // RPC-level (e.g. -5 not found): expected, return null
@@ -123,7 +123,7 @@ function ts_rpc_soft(array $net, string $method, array $params = [], ?int $timeo
  * array of results (null where that call errored). Used to resolve many
  * prevout txs / enrich block tx lists in one round-trip.
  */
-function ts_rpc_batch(array $net, array $calls): array
+function lx_rpc_batch(array $net, array $calls): array
 {
     if (!$calls) {
         return [];
@@ -138,7 +138,7 @@ function ts_rpc_batch(array $net, array $calls): array
             'params'  => $c[1] ?? [],
         ];
     }
-    list(, $resp) = ts_rpc_exec($rpc, json_encode($batch, JSON_UNESCAPED_SLASHES), (int) ($rpc['timeout'] ?? 40));
+    list(, $resp) = lx_rpc_exec($rpc, json_encode($batch, JSON_UNESCAPED_SLASHES), (int) ($rpc['timeout'] ?? 40));
 
     $json = json_decode($resp, true);
     if (!is_array($json)) {

@@ -1,7 +1,7 @@
 <?php
 /**
  * MWEB index incremental updater. Advances the self-contained peg index from
- * its cursor up to the chain tip, reusing the same ts_mweb_block extraction the
+ * its cursor up to the chain tip, reusing the same lx_mweb_block extraction the
  * web layer uses, and rolls back cleanly on reorgs. Reads only litecoind RPC.
  *
  * Run on a timer (LTC blocks ~2.5 min, so every ~2 min is plenty):
@@ -29,8 +29,8 @@ const MWEB_ONESHOT_SECS  = 90.0;
 $slug = $argv[1] ?? 'ltc-mainnet';
 $seed = in_array('--seed', $argv, true);
 
-$net = ts_net($slug);
-if (!$net || !ts_mweb_enabled($net)) {
+$net = lx_net($slug);
+if (!$net || !lx_mweb_enabled($net)) {
     fwrite(STDERR, "network '$slug' unknown or MWEB not enabled\n");
     exit(1);
 }
@@ -39,7 +39,7 @@ if (empty($net['mweb']['index']['enabled'])) {
     exit(1);
 }
 
-$db = ts_mweb_index_pdo($net, true);
+$db = lx_mweb_index_pdo($net, true);
 if (!$db) {
     fwrite(STDERR, "could not open index DB\n");
     exit(1);
@@ -60,7 +60,7 @@ $done = mweb_index_scan($db, $net, $budget);
 mweb_index_refresh_meta($db, $net);
 
 [$last] = mweb_meta_cursor($db, $net);
-$tip = ts_tip_height($net);
+$tip = lx_tip_height($net);
 echo "indexed $done block(s); last_indexed=$last tip=$tip lag=" . ($tip - $last) . "\n";
 
 flock($lock, LOCK_UN);
@@ -74,7 +74,7 @@ function mweb_meta_cursor(PDO $db, array $net): array
     if ($row) {
         return [(int) $row['last_indexed'], (string) $row['last_hash']];
     }
-    return [ts_mweb_activation($net) - 1, ''];
+    return [lx_mweb_activation($net) - 1, ''];
 }
 
 function mweb_meta_set_cursor(PDO $db, int $height, string $hash): void
@@ -89,8 +89,8 @@ function mweb_meta_set_cursor(PDO $db, int $height, string $hash): void
 function mweb_index_scan(PDO $db, array $net, float $budget): int
 {
     [$last] = mweb_meta_cursor($db, $net);
-    $start = max($last + 1, ts_mweb_activation($net));
-    $tip = ts_tip_height($net);
+    $start = max($last + 1, lx_mweb_activation($net));
+    $tip = lx_tip_height($net);
     if ($tip < $start) {
         return 0;
     }
@@ -101,11 +101,11 @@ function mweb_index_scan(PDO $db, array $net, float $budget): int
         if (microtime(true) > $budget) {
             break;
         }
-        $hash = ts_block_hash_at($net, $h);
+        $hash = lx_block_hash_at($net, $h);
         if ($hash === null) {
             break;   // RPC gap: stop, resume next run
         }
-        $m = ts_mweb_block($net, $hash, $h);          // existing builder (hash-cached)
+        $m = lx_mweb_block($net, $hash, $h);          // existing builder (hash-cached)
         if ($m === null) {
             break;   // unresolved (transient RPC error): resume this height next run, never skip past it
         }
@@ -130,7 +130,7 @@ function mweb_upsert_block_and_pegs(PDO $db, array $net, int $height, string $ha
     if ($m === null) {
         return;   // cursor still advances via mweb_meta_set_cursor
     }
-    $bt = ts_block_time_at($net, $hash) ?? 0;
+    $bt = lx_block_time_at($net, $hash) ?? 0;
     $db->prepare(
         'INSERT INTO mweb_blocks
            (block_height, block_time, block_hash, hogex_txid, supply_sat,
@@ -162,7 +162,7 @@ function mweb_upsert_block_and_pegs(PDO $db, array $net, int $height, string $ha
 /** Live best-chain hash at $height, bypassing the response cache (reorg-safe). */
 function mweb_live_block_hash(array $net, int $height): ?string
 {
-    $h = ts_rpc_soft($net, 'getblockhash', [$height]);
+    $h = lx_rpc_soft($net, 'getblockhash', [$height]);
     return is_string($h) ? $h : null;
 }
 

@@ -4,17 +4,17 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 header('Content-Type: application/xml; charset=utf-8');
-$base = ts_base_url();
+$base = lx_base_url();
 
 // /status is intentionally excluded - it is noindex, so listing it here would be
 // a mixed signal.
 $urls = [$base . '/', $base . '/docs', $base . '/donate'];
-$net = ts_net_default();
+$net = lx_net_default();
 if ($net) {
     foreach (['/blocks', '/mempool', '/mining', '/charts', '/node', '/tools'] as $p) {
         $urls[] = $base . $p;
     }
-    if (ts_mweb_enabled($net)) {
+    if (lx_mweb_enabled($net)) {
         $urls[] = $base . '/mweb';
     }
 }

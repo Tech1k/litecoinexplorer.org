@@ -29,23 +29,23 @@
 // Max heights per /api/mweb/blocks scan. Each height is a full HogEx fetch
 // (several RPC round-trips when cold), so this is deliberately far lower than
 // the wallet helper's raw-passthrough range, and the scan is also time-budgeted.
-const TS_MWEB_MAX_RANGE = 30;
+const LX_MWEB_MAX_RANGE = 30;
 
 /** True iff MWEB features apply to this network and are enabled in config. */
-function ts_mweb_enabled(array $net): bool
+function lx_mweb_enabled(array $net): bool
 {
     if (($net['coin'] ?? '') !== 'ltc') {
         return false;
     }
     $flag = $net['mweb']['enabled'] ?? false;
     if ($flag === 'auto') {
-        return ts_mweb_active($net)['active'];
+        return lx_mweb_active($net)['active'];
     }
     return !empty($flag);
 }
 
 /** Configured MWEB activation height (below which no block is scanned). */
-function ts_mweb_activation(array $net): int
+function lx_mweb_activation(array $net): int
 {
     return (int) ($net['mweb']['activation'] ?? $net['mweb_activation'] ?? 0);
 }
@@ -54,10 +54,10 @@ function ts_mweb_activation(array $net): int
  * Chain tip plus MWEB soft-fork state (short TTL). Never throws: on an RPC
  * failure it reports inactive rather than erroring, so callers can gate safely.
  */
-function ts_mweb_active(array $net): array
+function lx_mweb_active(array $net): array
 {
     return cache_remember('mwebact:' . $net['slug'], 5, function () use ($net) {
-        $c = ts_rpc_soft($net, 'getblockchaininfo');
+        $c = lx_rpc_soft($net, 'getblockchaininfo');
         if (!is_array($c)) {
             return ['height' => 0, 'hash' => '', 'chain' => '', 'active' => false];
         }
@@ -78,7 +78,7 @@ function ts_mweb_active(array $net): array
  *   peg-in  = OP_9 (0x59) push-32 -> hex "5920..."
  *   hogaddr = OP_8 (0x58) push-32 -> hex "5820..."
  */
-function ts_mweb_spk_kind(array $o): ?string
+function lx_mweb_spk_kind(array $o): ?string
 {
     $t = $o['scriptpubkey_type'] ?? ($o['type'] ?? '');
     if ($t === 'witness_mweb_pegin') {
@@ -100,22 +100,22 @@ function ts_mweb_spk_kind(array $o): ?string
 
 /**
  * MWEB summary for an already-built Esplora tx, or null if the tx has no MWEB
- * outputs. Drives the tx-page badges and is reused by ts_mweb_block for the
+ * outputs. Drives the tx-page badges and is reused by lx_mweb_block for the
  * HogEx. Note peg-ins here are this tx's own peg-in OUTPUTS (a peg-in tx);
- * block-level peg-ins are read from the HogEx inputs in ts_mweb_block.
+ * block-level peg-ins are read from the HogEx inputs in lx_mweb_block.
  */
-function ts_mweb_tx_info(array $tx): ?array
+function lx_mweb_tx_info(array $tx): ?array
 {
     $vout = $tx['vout'] ?? [];
     if (!$vout) {
         return null;
     }
-    $isHogex = ts_mweb_spk_kind($vout[0]) === 'hogaddr';
+    $isHogex = lx_mweb_spk_kind($vout[0]) === 'hogaddr';
 
     $pegins = [];
     $peginTotal = 0;
     foreach ($vout as $n => $vo) {
-        if (ts_mweb_spk_kind($vo) === 'pegin') {
+        if (lx_mweb_spk_kind($vo) === 'pegin') {
             $v = (int) ($vo['value'] ?? 0);
             $pegins[] = ['n' => $n, 'value_sat' => $v];
             $peginTotal += $v;
@@ -128,7 +128,7 @@ function ts_mweb_tx_info(array $tx): ?array
     if ($isHogex) {
         $supply = (int) ($vout[0]['value'] ?? 0);
         foreach ($vout as $n => $vo) {
-            if ($n === 0 || ts_mweb_spk_kind($vo) === 'hogaddr') {
+            if ($n === 0 || lx_mweb_spk_kind($vo) === 'hogaddr') {
                 continue;   // vout[0] is the supply commitment, not a peg-out
             }
             $v = (int) ($vo['value'] ?? 0);
@@ -155,7 +155,7 @@ function ts_mweb_tx_info(array $tx): ?array
  * when the block is below activation or carries no HogEx. Cached forever by
  * block hash (immutable). Amounts are integer satoshis.
  */
-function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?array
+function lx_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?array
 {
     $ckey = 'mwebblk:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($ckey);
@@ -173,8 +173,8 @@ function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?arr
     // blocks straight from SQLite. A miss (a not-yet-indexed or zero-activity
     // block) falls through to the RPC walk below, so correctness never depends
     // on the index; it is purely an acceleration layer.
-    if (ts_mweb_index_ready($net)) {
-        $row = ts_mweb_index_block_by_hash($net, $hash);
+    if (lx_mweb_index_ready($net)) {
+        $row = lx_mweb_index_block_by_hash($net, $hash);
         if ($row !== null) {
             cache_set($ckey, json_encode($row, JSON_UNESCAPED_SLASHES), 0);
             return $row;
@@ -183,12 +183,12 @@ function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?arr
 
     // Height is used only to short-circuit pre-activation blocks; callers that
     // already know it (range/recent walks) pass it in to save an RPC round-trip.
-    $height = $knownHeight ?? ts_block_height_for_hash($net, $hash);
-    if ($height !== null && $height < ts_mweb_activation($net)) {
+    $height = $knownHeight ?? lx_block_height_for_hash($net, $hash);
+    if ($height !== null && $height < lx_mweb_activation($net)) {
         return null;   // pre-activation, cannot carry a HogEx
     }
 
-    $txids = ts_block_txids($net, $hash);
+    $txids = lx_block_txids($net, $hash);
     if (!$txids) {
         return null;
     }
@@ -200,12 +200,12 @@ function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?arr
     $fetchFailed = false;
     $lim = max(0, count($txids) - 3);
     for ($i = count($txids) - 1; $i >= $lim; $i--) {
-        $cand = ts_esplora_tx($net, $txids[$i], $hash);
+        $cand = lx_esplora_tx($net, $txids[$i], $hash);
         if ($cand === null) {
             $fetchFailed = true;   // transient RPC error, not a confirmed non-HogEx
             continue;
         }
-        if (isset($cand['vout'][0]) && ts_mweb_spk_kind($cand['vout'][0]) === 'hogaddr') {
+        if (isset($cand['vout'][0]) && lx_mweb_spk_kind($cand['vout'][0]) === 'hogaddr') {
             $hogex = $cand;
             $hogexTxid = $txids[$i];
             break;
@@ -221,14 +221,14 @@ function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?arr
         return null;
     }
 
-    $info = ts_mweb_tx_info($hogex);
+    $info = lx_mweb_tx_info($hogex);
 
     // Peg-ins: the HogEx spends every peg-in output created in this block.
     $pegins = [];
     $peginTotal = 0;
     foreach ($hogex['vin'] as $vi) {
         $po = $vi['prevout'] ?? null;
-        if ($po !== null && ts_mweb_spk_kind($po) === 'pegin') {
+        if ($po !== null && lx_mweb_spk_kind($po) === 'pegin') {
             $v = (int) ($po['value'] ?? 0);
             $pegins[] = ['txid' => $vi['txid'], 'vout' => (int) $vi['vout'], 'value_sat' => $v];
             $peginTotal += $v;
@@ -267,17 +267,17 @@ function ts_mweb_block(array $net, string $hash, ?int $knownHeight = null): ?arr
  * HogEx, so all carry a supply figure; most have zero peg activity). Bounded
  * and cheap. Cached ~15s. Newest first.
  */
-function ts_mweb_recent(array $net, int $limit = 15): array
+function lx_mweb_recent(array $net, int $limit = 15): array
 {
     return cache_remember('mwebrecent:' . $net['slug'] . ':' . $limit, 15, function () use ($net, $limit) {
-        if (ts_mweb_index_ready($net) && ($db = ts_mweb_index_pdo($net, false)) !== null) {
+        if (lx_mweb_index_ready($net) && ($db = lx_mweb_index_pdo($net, false)) !== null) {
             try {
                 $st = $db->prepare('SELECT * FROM mweb_blocks ORDER BY block_height DESC LIMIT ?');
                 $st->bindValue(1, $limit, PDO::PARAM_INT);
                 $st->execute();
                 $rows = [];
                 foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $b) {
-                    $rows[] = ts_mweb_index_hydrate($db, $b);
+                    $rows[] = lx_mweb_index_hydrate($db, $b);
                 }
                 if ($rows) {
                     return $rows;
@@ -286,19 +286,19 @@ function ts_mweb_recent(array $net, int $limit = 15): array
                 // fall through to the live RPC walk
             }
         }
-        $tip = ts_tip_height($net);
-        $act = ts_mweb_activation($net);
+        $tip = lx_tip_height($net);
+        $act = lx_mweb_activation($net);
         $deadline = microtime(true) + 6.0;   // bound the cold-cache first load
         $rows = [];
         for ($h = $tip; $h > $tip - $limit && $h >= $act; $h--) {
             if (microtime(true) > $deadline) {
                 break;
             }
-            $hash = ts_block_hash_at($net, $h);
+            $hash = lx_block_hash_at($net, $h);
             if ($hash === null) {
                 continue;
             }
-            $m = ts_mweb_block($net, $hash, $h);
+            $m = lx_mweb_block($net, $hash, $h);
             if ($m !== null) {
                 $rows[] = $m;
             }
@@ -312,25 +312,25 @@ function ts_mweb_recent(array $net, int $limit = 15): array
  * (partial result, not an error) and returns only blocks with peg activity,
  * mirroring the wallet helper's ?from&to semantics.
  */
-function ts_mweb_range(array $net, int $from, int $to): array
+function lx_mweb_range(array $net, int $from, int $to): array
 {
     // Bound the span up front so BOTH the index fast path and the RPC scan stay
     // capped (an uncapped index BETWEEN + per-row hydrate was a DoS vector).
-    if ($to - $from + 1 > TS_MWEB_MAX_RANGE) {
-        $to = $from + TS_MWEB_MAX_RANGE - 1;
+    if ($to - $from + 1 > LX_MWEB_MAX_RANGE) {
+        $to = $from + LX_MWEB_MAX_RANGE - 1;
     }
     // Index fast path: instant when the peg index is fresh.
-    if (ts_mweb_index_ready($net) && ($db = ts_mweb_index_pdo($net, false)) !== null) {
+    if (lx_mweb_index_ready($net) && ($db = lx_mweb_index_pdo($net, false)) !== null) {
         try {
             $st = $db->prepare('SELECT * FROM mweb_blocks WHERE block_height BETWEEN ? AND ? '
                 . 'AND (pegin_count > 0 OR pegout_count > 0) ORDER BY block_height LIMIT ?');
             $st->bindValue(1, $from, PDO::PARAM_INT);
             $st->bindValue(2, $to, PDO::PARAM_INT);
-            $st->bindValue(3, TS_MWEB_MAX_RANGE, PDO::PARAM_INT);
+            $st->bindValue(3, LX_MWEB_MAX_RANGE, PDO::PARAM_INT);
             $st->execute();
             $blocks = [];
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $b) {
-                $blocks[] = ts_mweb_index_hydrate($db, $b);
+                $blocks[] = lx_mweb_index_hydrate($db, $b);
             }
             return ['from' => $from, 'to' => $to, 'blocks' => $blocks];
         } catch (Throwable $e) {
@@ -344,11 +344,11 @@ function ts_mweb_range(array $net, int $from, int $to): array
         if (microtime(true) > $deadline) {
             break;   // budget exhausted: return partial, client resumes from 'to'+1
         }
-        $hash = ts_block_hash_at($net, $h);
+        $hash = lx_block_hash_at($net, $h);
         if ($hash === null) {
             break;   // past tip
         }
-        $m = ts_mweb_block($net, $hash, $h);
+        $m = lx_mweb_block($net, $hash, $h);
         if ($m !== null && ($m['pegin_count'] > 0 || $m['pegout_count'] > 0)) {
             $blocks[] = $m;
         }
@@ -362,11 +362,11 @@ function ts_mweb_range(array $net, int $from, int $to): array
 // An optional acceleration layer. Seeded once from an mwebscan analytics DB
 // (tools/mweb-seed.php) and kept fresh by tools/mweb-index.php, it lets the
 // history views, supply chart and peg lists be served from indexed SQLite
-// instead of walking blocks over RPC. Every read gates on ts_mweb_index_ready()
+// instead of walking blocks over RPC. Every read gates on lx_mweb_index_ready()
 // and falls back to the RPC path, so the index is never a correctness dependency
 // and can be wiped/rebuilt at will. All amounts are integer satoshis.
 
-const TS_MWEB_INDEX_DDL = <<<'SQL'
+const LX_MWEB_INDEX_DDL = <<<'SQL'
 CREATE TABLE IF NOT EXISTS mweb_blocks (
   block_height     INTEGER PRIMARY KEY,
   block_time       INTEGER NOT NULL,
@@ -424,7 +424,7 @@ SQL;
  * cache is best-effort). With $create it runs the DDL and makes the directory;
  * without it, a missing file returns null rather than creating an empty DB.
  */
-function ts_mweb_index_pdo(array $net, bool $create = false): ?PDO
+function lx_mweb_index_pdo(array $net, bool $create = false): ?PDO
 {
     static $cache = [];
     $slug = $net['slug'];
@@ -451,7 +451,7 @@ function ts_mweb_index_pdo(array $net, bool $create = false): ?PDO
         $db->exec('PRAGMA journal_mode = WAL');
         $db->exec('PRAGMA synchronous = NORMAL');
         if ($create) {
-            $db->exec(TS_MWEB_INDEX_DDL);
+            $db->exec(LX_MWEB_INDEX_DDL);
         }
         return $cache[$slug] = $db;
     } catch (Throwable $e) {
@@ -463,13 +463,13 @@ function ts_mweb_index_pdo(array $net, bool $create = false): ?PDO
  * Whether the index is enabled, present, and within max_lag blocks of the tip.
  * Cached ~5s. When false, every read falls back to the live RPC path.
  */
-function ts_mweb_index_ready(array $net): bool
+function lx_mweb_index_ready(array $net): bool
 {
     if (empty($net['mweb']['index']['enabled'])) {
         return false;
     }
     return cache_remember('mwebidxok:' . $net['slug'], 5, function () use ($net) {
-        $db = ts_mweb_index_pdo($net, false);
+        $db = lx_mweb_index_pdo($net, false);
         if (!$db) {
             return false;
         }
@@ -481,7 +481,7 @@ function ts_mweb_index_ready(array $net): bool
         if ($last === false || $last === null) {
             return false;
         }
-        $tip = ts_mweb_active($net)['height'];
+        $tip = lx_mweb_active($net)['height'];
         if ($tip <= 0) {
             return false;
         }
@@ -490,8 +490,8 @@ function ts_mweb_index_ready(array $net): bool
     });
 }
 
-/** Build the ts_mweb_block-shaped array from an indexed mweb_blocks row. */
-function ts_mweb_index_hydrate(PDO $db, array $b): array
+/** Build the lx_mweb_block-shaped array from an indexed mweb_blocks row. */
+function lx_mweb_index_hydrate(PDO $db, array $b): array
 {
     $h = (int) $b['block_height'];
     $pegins = [];
@@ -521,10 +521,10 @@ function ts_mweb_index_hydrate(PDO $db, array $b): array
     ];
 }
 
-/** Indexed block by hash, or null if absent. Same shape as ts_mweb_block. */
-function ts_mweb_index_block_by_hash(array $net, string $hash): ?array
+/** Indexed block by hash, or null if absent. Same shape as lx_mweb_block. */
+function lx_mweb_index_block_by_hash(array $net, string $hash): ?array
 {
-    $db = ts_mweb_index_pdo($net, false);
+    $db = lx_mweb_index_pdo($net, false);
     if (!$db) {
         return null;
     }
@@ -535,16 +535,16 @@ function ts_mweb_index_block_by_hash(array $net, string $hash): ?array
     } catch (Throwable $e) {
         return null;
     }
-    return $b ? ts_mweb_index_hydrate($db, $b) : null;
+    return $b ? lx_mweb_index_hydrate($db, $b) : null;
 }
 
 /**
  * Downsampled supply time-series (one point per UTC day), oldest-first, for the
  * chart. Index-only: returns [] when the index is not ready.
  */
-function ts_mweb_supply_series(array $net, int $limit = 400): array
+function lx_mweb_supply_series(array $net, int $limit = 400): array
 {
-    if (!ts_mweb_index_ready($net) || ($db = ts_mweb_index_pdo($net, false)) === null) {
+    if (!lx_mweb_index_ready($net) || ($db = lx_mweb_index_pdo($net, false)) === null) {
         return [];
     }
     $limit = max(1, min(2000, $limit));
@@ -575,7 +575,7 @@ function ts_mweb_supply_series(array $net, int $limit = 400): array
  * null if absent/malformed. Strict validation (values are also bound as params,
  * so this is defence in depth). $seq is the vout (peg-in) or n (peg-out).
  */
-function ts_mweb_cursor_parse(?string $tok): ?array
+function lx_mweb_cursor_parse(?string $tok): ?array
 {
     if ($tok === null || $tok === '') {
         return null;
@@ -595,14 +595,14 @@ function ts_mweb_cursor_parse(?string $tok): ?array
  * (a plain height-exclusive cursor would silently drop the rest of that block).
  * 'next' is the token to pass as the next ?before=, or null at the end.
  */
-function ts_mweb_pegins_page(array $net, ?string $before = null, int $limit = 50): array
+function lx_mweb_pegins_page(array $net, ?string $before = null, int $limit = 50): array
 {
     $empty = ['pegins' => [], 'next' => null];
-    if (!ts_mweb_index_ready($net) || ($db = ts_mweb_index_pdo($net, false)) === null) {
+    if (!lx_mweb_index_ready($net) || ($db = lx_mweb_index_pdo($net, false)) === null) {
         return $empty;
     }
     $limit = max(1, min(100, $limit));
-    $cur = ts_mweb_cursor_parse($before);
+    $cur = lx_mweb_cursor_parse($before);
     try {
         $sql = 'SELECT txid, vout, block_height, block_time, value_sat FROM mweb_pegins '
             . ($cur !== null ? 'WHERE (block_height, txid, vout) < (?, ?, ?) ' : '')
@@ -639,15 +639,15 @@ function ts_mweb_pegins_page(array $net, ?string $before = null, int $limit = 50
     return ['pegins' => $pegins, 'next' => $next];
 }
 
-/** A page of peg-outs newest-first. Same keyset-cursor semantics as ts_mweb_pegins_page. */
-function ts_mweb_pegouts_page(array $net, ?string $before = null, int $limit = 50): array
+/** A page of peg-outs newest-first. Same keyset-cursor semantics as lx_mweb_pegins_page. */
+function lx_mweb_pegouts_page(array $net, ?string $before = null, int $limit = 50): array
 {
     $empty = ['pegouts' => [], 'next' => null];
-    if (!ts_mweb_index_ready($net) || ($db = ts_mweb_index_pdo($net, false)) === null) {
+    if (!lx_mweb_index_ready($net) || ($db = lx_mweb_index_pdo($net, false)) === null) {
         return $empty;
     }
     $limit = max(1, min(100, $limit));
-    $cur = ts_mweb_cursor_parse($before);
+    $cur = lx_mweb_cursor_parse($before);
     try {
         $sql = 'SELECT txid, n, block_height, block_time, value_sat, address FROM mweb_pegouts '
             . ($cur !== null ? 'WHERE (block_height, txid, n) < (?, ?, ?) ' : '')
@@ -690,13 +690,13 @@ function ts_mweb_pegouts_page(array $net, ?string $before = null, int $limit = 5
  * Aggregate peg totals + shielded supply for the privacy analytics panel.
  * Index-only (returns null when the index is not ready). Cached ~60s.
  */
-function ts_mweb_peg_totals(array $net): ?array
+function lx_mweb_peg_totals(array $net): ?array
 {
-    if (!ts_mweb_index_ready($net)) {
+    if (!lx_mweb_index_ready($net)) {
         return null;
     }
     return cache_remember('mwebtotals:' . $net['slug'], 60, function () use ($net) {
-        $db = ts_mweb_index_pdo($net, false);
+        $db = lx_mweb_index_pdo($net, false);
         if (!$db) {
             return null;
         }
@@ -725,10 +725,10 @@ function ts_mweb_peg_totals(array $net): ?array
  * amounts to draw, and best-effort MWEBscan round-trip links. Works RPC-only
  * (totals/links simply come back null/[]). Cheap: every sub-call is memoized.
  */
-function ts_mweb_live_snapshot(array $net): array
+function lx_mweb_live_snapshot(array $net): array
 {
-    $st     = ts_mweb_active($net);
-    $recent = ts_mweb_recent($net, 12);
+    $st     = lx_mweb_active($net);
+    $recent = lx_mweb_recent($net, 12);
     // Newest two supply-bearing blocks give the absolute supply + last-block delta.
     $supply = null; $supplyPrev = null;
     foreach ($recent as $b) {
@@ -736,7 +736,7 @@ function ts_mweb_live_snapshot(array $net): array
         if ($supply === null) { $supply = (int) $b['supply_sat']; }
         elseif ($supplyPrev === null) { $supplyPrev = (int) $b['supply_sat']; break; }
     }
-    $kern    = ts_mweb_kernels($net);
+    $kern    = lx_mweb_kernels($net);
     $kernels = is_array($kern) ? ($kern['kernels'] ?? null) : null;
     $outputs = is_array($kern) ? ($kern['outputs'] ?? null) : null;
 
@@ -761,11 +761,11 @@ function ts_mweb_live_snapshot(array $net): array
     // most of the time). Prefer the index (newest N regardless of age); fall back to
     // flattening the recent blocks when the index is off.
     $rin = []; $rout = [];
-    if (ts_mweb_index_ready($net)) {
-        foreach (ts_mweb_pegins_page($net, null, 8)['pegins'] as $p) {
+    if (lx_mweb_index_ready($net)) {
+        foreach (lx_mweb_pegins_page($net, null, 8)['pegins'] as $p) {
             $rin[] = ['value_sat' => (int) $p['value_sat'], 'height' => (int) $p['block_height'], 'txid' => (string) $p['txid']];
         }
-        foreach (ts_mweb_pegouts_page($net, null, 8)['pegouts'] as $p) {
+        foreach (lx_mweb_pegouts_page($net, null, 8)['pegouts'] as $p) {
             $rout[] = ['value_sat' => (int) $p['value_sat'], 'height' => (int) $p['block_height'], 'txid' => (string) $p['txid']];
         }
     } else {
@@ -784,8 +784,8 @@ function ts_mweb_live_snapshot(array $net): array
 
     // Best-effort round-trip links (external MWEBscan; [] when dormant/unreachable).
     $links = [];
-    if (function_exists('ts_mwebscan_enabled') && ts_mwebscan_enabled($net)) {
-        $lr = ts_mwebscan_api($net, 'links', ['limit' => '6', 'min_confidence' => '0.6'], 120);
+    if (function_exists('lx_mwebscan_enabled') && lx_mwebscan_enabled($net)) {
+        $lr = lx_mwebscan_api($net, 'links', ['limit' => '6', 'min_confidence' => '0.6'], 120);
         if (is_array($lr) && is_array($lr['links'] ?? null)) {
             foreach ($lr['links'] as $L) {
                 $links[] = [
@@ -806,7 +806,7 @@ function ts_mweb_live_snapshot(array $net): array
         'supply_prev_sat' => $supplyPrev,
         'kernels'         => $kernels,
         'outputs'         => $outputs,
-        'totals'          => ts_mweb_index_ready($net) ? ts_mweb_peg_totals($net) : null,
+        'totals'          => lx_mweb_index_ready($net) ? lx_mweb_peg_totals($net) : null,
         'blocks'          => $blocks,
         'pegins'          => $rin,
         'pegouts'         => $rout,
@@ -826,13 +826,13 @@ function ts_mweb_live_snapshot(array $net): array
  * returns null and the caller hides the stat. Returns
  * ['kernels' => int, 'outputs' => int|null] or null.
  */
-function ts_mweb_ext_counts(array $net, string $hash): ?array
+function lx_mweb_ext_counts(array $net, string $hash): ?array
 {
     // getblock verbosity 2 is heavy and 500s on some litecoind builds; a transport
-    // error or non-JSON 500 can propagate out of ts_rpc_soft, so guard it here and
+    // error or non-JSON 500 can propagate out of lx_rpc_soft, so guard it here and
     // hide the stat rather than take down the whole block/MWEB page.
     try {
-        $b = ts_rpc_soft($net, 'getblock', [$hash, 2]);
+        $b = lx_rpc_soft($net, 'getblock', [$hash, 2]);
     } catch (Throwable $e) {
         return null;
     }
@@ -864,17 +864,17 @@ function ts_mweb_ext_counts(array $net, string $hash): ?array
  * The chain tip's MWEB header counts (cumulative output set + this-block kernels).
  * Cached ~90s. Returns ['kernels' => int, 'outputs' => int|null] or null.
  */
-function ts_mweb_kernels(array $net): ?array
+function lx_mweb_kernels(array $net): ?array
 {
-    if (!ts_mweb_enabled($net)) {
+    if (!lx_mweb_enabled($net)) {
         return null;
     }
     // Cache a sentinel for the null/unavailable case too (cache_remember would drop
     // a null return and re-run this heavy getblock-2 on every hit against a slow or
     // verbosity-2-less node).
     $got = cache_remember('mwebkernels:' . $net['slug'], 90, function () use ($net) {
-        $hash = ts_rpc_soft($net, 'getbestblockhash');
-        $c = is_string($hash) ? ts_mweb_ext_counts($net, $hash) : null;
+        $hash = lx_rpc_soft($net, 'getbestblockhash');
+        $c = is_string($hash) ? lx_mweb_ext_counts($net, $hash) : null;
         return $c === null ? ['k' => -1] : $c;
     });
     return (is_array($got) && !isset($got['k'])) ? $got : null;
@@ -885,9 +885,9 @@ function ts_mweb_kernels(array $net): ?array
  * transaction count), or null if unavailable. Cached long by hash since a
  * confirmed block is immutable.
  */
-function ts_mweb_block_kernels(array $net, string $hash): ?int
+function lx_mweb_block_kernels(array $net, string $hash): ?int
 {
-    if (!ts_mweb_enabled($net)) {
+    if (!lx_mweb_enabled($net)) {
         return null;
     }
     $key = 'mwebblkkern:' . $net['slug'] . ':' . $hash;
@@ -896,7 +896,7 @@ function ts_mweb_block_kernels(array $net, string $hash): ?int
         $v = (int) $hit;
         return $v >= 0 ? $v : null;   // -1 is the cached "unavailable" sentinel
     }
-    $c = ts_mweb_ext_counts($net, $hash);
+    $c = lx_mweb_ext_counts($net, $hash);
     if ($c === null) {
         cache_set($key, '-1', 1800);   // node lacks verbosity-2 or a transient miss: retry in ~30 min
         return null;
@@ -912,9 +912,9 @@ function ts_mweb_block_kernels(array $net, string $hash): ?int
  * e.g. 'https://testnet.mwebscan.com/block/{hash}'. Dormant until then, so no
  * broken links appear if MWEBscan has no block pages yet.
  */
-function ts_mwebscan_block_url(array $net, string $hash, int $height): ?string
+function lx_mwebscan_block_url(array $net, string $hash, int $height): ?string
 {
-    $tpl = $net['mwebscan_block'] ?? (ts_config()['mwebscan_block'] ?? null);
+    $tpl = $net['mwebscan_block'] ?? (lx_config()['mwebscan_block'] ?? null);
     if (!is_string($tpl) || strpos($tpl, '{') === false) {
         return null;
     }
@@ -927,14 +927,14 @@ function ts_mwebscan_block_url(array $net, string $hash, int $height): ?string
  * ['address','count','total_sat','first_h','last_h']. Index-only; empty without
  * it. Cached ~2 min.
  */
-function ts_mweb_pegout_clusters(array $net, int $limit = 15): array
+function lx_mweb_pegout_clusters(array $net, int $limit = 15): array
 {
-    if (!ts_mweb_index_ready($net)) {
+    if (!lx_mweb_index_ready($net)) {
         return [];
     }
     $limit = max(1, min(100, $limit));
     return cache_remember('mwebclusters:' . $net['slug'] . ':' . $limit, 120, function () use ($net, $limit) {
-        $db = ts_mweb_index_pdo($net, false);
+        $db = lx_mweb_index_pdo($net, false);
         if (!$db) {
             return [];
         }

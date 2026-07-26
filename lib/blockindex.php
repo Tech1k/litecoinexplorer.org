@@ -12,7 +12,7 @@
  */
 
 /** Blocks in a mempool.space :timePeriod, at ~576 LTC blocks/day (2.5 min spacing). */
-function ts_blockindex_period_blocks(string $period): int
+function lx_blockindex_period_blocks(string $period): int
 {
     static $m = ['24h' => 576, '3d' => 1728, '1w' => 4032, '1m' => 17280, '3m' => 51840,
                  '6m' => 103680, '1y' => 210240, '2y' => 420480, '3y' => 630720, 'all' => PHP_INT_MAX];
@@ -20,20 +20,20 @@ function ts_blockindex_period_blocks(string $period): int
 }
 
 /** How many recent blocks to retain in the index (config 'blockindex_retain', default ~90 days). */
-function ts_blockindex_retain(): int
+function lx_blockindex_retain(): int
 {
-    $r = (int) (ts_config()['blockindex_retain'] ?? 52560);
+    $r = (int) (lx_config()['blockindex_retain'] ?? 52560);
     if ($r <= 0) { return 0; }        // 0 (or negative) = retain the whole chain (never prune)
     return max(2016, $r);             // otherwise clamp positive values to a sane floor
 }
 
-function ts_blockindex_pdo(bool $create = false): ?PDO
+function lx_blockindex_pdo(bool $create = false): ?PDO
 {
     static $pdo = false;
     if ($pdo !== false) {
         return $pdo;
     }
-    $cache = ts_config()['cache_db'] ?? null;
+    $cache = lx_config()['cache_db'] ?? null;
     $path = $cache ? dirname($cache) . '/blockindex.sqlite' : null;
     if (!$path || (!$create && !is_file($path))) {
         return $pdo = null;
@@ -64,21 +64,21 @@ function ts_blockindex_pdo(bool $create = false): ?PDO
 
 /**
  * Index one block by height (getblockstats + pool attribution). Pass $hash to force a specific
- * (canonical) hash - used by the reorg guard so ts_block_stats/pool are keyed off the fresh hash
+ * (canonical) hash - used by the reorg guard so lx_block_stats/pool are keyed off the fresh hash
  * and skip any stale height cache. Returns false if unavailable.
  */
-function ts_blockindex_put(PDO $db, array $net, int $height, ?string $hash = null): bool
+function lx_blockindex_put(PDO $db, array $net, int $height, ?string $hash = null): bool
 {
-    $hash = $hash ?? ts_block_hash_at($net, $height);
+    $hash = $hash ?? lx_block_hash_at($net, $height);
     if ($hash === null) {
         return false;
     }
-    $bs = ts_block_stats($net, $hash, $height);
+    $bs = lx_block_stats($net, $hash, $height);
     if (!is_array($bs)) {
         return false;
     }
     $p = $bs['feerate_pcts'] ?? [0, 0, 0, 0, 0];
-    $pool = ts_block_pool($net, $hash);
+    $pool = lx_block_pool($net, $hash);
     try {
         $db->prepare('INSERT OR REPLACE INTO block_index (net,height,time,total_fee,subsidy,txs,size,weight,p10,p25,p50,p75,p90,pool,hash) '
             . 'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
@@ -98,18 +98,18 @@ function ts_blockindex_put(PDO $db, array $net, int $height, ?string $hash = nul
  * downward toward the retention floor, bounded to $maxPerRun writes total. Prunes below the floor.
  * Returns how many blocks were indexed this pass.
  */
-function ts_blockindex_tick(array $net, ?int $maxPerRun = null): int
+function lx_blockindex_tick(array $net, ?int $maxPerRun = null): int
 {
-    $db = ts_blockindex_pdo(true);
+    $db = lx_blockindex_pdo(true);
     if (!$db) {
         return 0;
     }
-    $maxPerRun = $maxPerRun ?? max(10, (int) (ts_config()['blockindex_per_run'] ?? 150));
-    $tip = ts_tip_height($net);
+    $maxPerRun = $maxPerRun ?? max(10, (int) (lx_config()['blockindex_per_run'] ?? 150));
+    $tip = lx_tip_height($net);
     if ($tip <= 0) {
         return 0;
     }
-    $retain = ts_blockindex_retain();
+    $retain = lx_blockindex_retain();
     $floor  = $retain > 0 ? max(0, $tip - $retain) : 0;   // retain <= 0 => keep the full chain (never prune; backfill to genesis)
     $done = 0;
     try {
@@ -131,9 +131,9 @@ function ts_blockindex_tick(array $net, ?int $maxPerRun = null): int
             $rc = $db->prepare('SELECT height, hash FROM block_index WHERE net = ? ORDER BY height DESC LIMIT 6');
             $rc->execute([$net['slug']]);
             foreach ($rc->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                $live = ts_rpc_soft($net, 'getblockhash', [(int) $row['height']]);
+                $live = lx_rpc_soft($net, 'getblockhash', [(int) $row['height']]);
                 if (is_string($live) && $live !== (string) ($row['hash'] ?? '')) {
-                    ts_blockindex_put($db, $net, (int) $row['height'], $live);
+                    lx_blockindex_put($db, $net, (int) $row['height'], $live);
                 }
             }
         } catch (Throwable $e) {
@@ -142,12 +142,12 @@ function ts_blockindex_tick(array $net, ?int $maxPerRun = null): int
     $attempts = 0; $fails = 0;
     if (!$have) {
         $attempts++;
-        if (ts_blockindex_put($db, $net, $tip)) { $done++; } else { return 0; }
+        if (lx_blockindex_put($db, $net, $tip)) { $done++; } else { return 0; }
         $lo = $tip;
     } else {
         for ($h = (int) $r['mx'] + 1; $h <= $tip && $attempts < $maxPerRun; $h++) {   // forward-fill new blocks (contiguous)
             $attempts++;
-            if (ts_blockindex_put($db, $net, $h)) { $done++; }
+            if (lx_blockindex_put($db, $net, $h)) { $done++; }
             else { break; }   // stay contiguous: stop at the first gap and retry it next run, never skip past it (a transient RPC miss must not strand a permanent hole in the series)
         }
         $lo = (int) $r['mn'];
@@ -155,7 +155,7 @@ function ts_blockindex_tick(array $net, ?int $maxPerRun = null): int
     $fails = 0;
     for ($h = $lo - 1; $h >= $floor && $attempts < $maxPerRun; $h--) {               // backfill downward
         $attempts++;
-        if (ts_blockindex_put($db, $net, $h)) { $done++; $fails = 0; }
+        if (lx_blockindex_put($db, $net, $h)) { $done++; $fails = 0; }
         elseif (++$fails >= 20) { break; }
     }
     try {
@@ -166,9 +166,9 @@ function ts_blockindex_tick(array $net, ?int $maxPerRun = null): int
 }
 
 /** Indexed range for status/coverage: ['min'=>?int,'max'=>?int,'count'=>int]. */
-function ts_blockindex_range(array $net): array
+function lx_blockindex_range(array $net): array
 {
-    $db = ts_blockindex_pdo(false);
+    $db = lx_blockindex_pdo(false);
     if (!$db) {
         return ['min' => null, 'max' => null, 'count' => 0];
     }
@@ -188,14 +188,14 @@ function ts_blockindex_range(array $net): array
  * [['avgHeight'=>int,'timestamp'=>int,'avgFees'=>float,'avgRewards'=>float,'avgTxs'=>float,
  *   'avgSize'=>float,'avgWeight'=>float,'p10'..'p90'=>float], ...] capped to ~$maxPoints.
  */
-function ts_blockindex_series(array $net, string $period, int $maxPoints = 240): array
+function lx_blockindex_series(array $net, string $period, int $maxPoints = 240): array
 {
-    $db = ts_blockindex_pdo(false);
+    $db = lx_blockindex_pdo(false);
     if (!$db) {
         return [];
     }
-    $tip = ts_tip_height($net);
-    $span = ts_blockindex_period_blocks($period);
+    $tip = lx_tip_height($net);
+    $span = lx_blockindex_period_blocks($period);
     $floor = $span === PHP_INT_MAX ? 0 : max(0, $tip - $span);
     try {
         $st = $db->prepare('SELECT * FROM block_index WHERE net = ? AND height >= ? ORDER BY height ASC');

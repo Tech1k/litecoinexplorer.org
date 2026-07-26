@@ -39,9 +39,9 @@ if ($segs === ['.well-known', 'security.txt'] || $segs === ['security.txt']) {
 // Top-level info pages. These now share the site's nav/footer, so they need the
 // default network resolved (single-chain: the sole enabled net).
 if (count($segs) === 1 && in_array($segs[0], ['docs', 'donate', 'status'], true)) {
-    $net = ts_net_default();
+    $net = lx_net_default();
     if ($net === null) {   // degenerate config: these pages need $net for the shared chrome
-        ts_not_found($method);
+        lx_not_found($method);
     }
     require __DIR__ . '/views/' . $segs[0] . '.php';
     exit;
@@ -50,20 +50,20 @@ if (count($segs) === 1 && in_array($segs[0], ['docs', 'donate', 'status'], true)
 // Dynamic Open Graph card image: /og/<type>/<id>.png. Best-effort - it serves
 // the static banner when GD/FreeType, a font, or the data is unavailable.
 if (isset($segs[0]) && $segs[0] === 'og') {
-    ts_route_og(array_slice($segs, 1), $method);
+    lx_route_og(array_slice($segs, 1), $method);
     exit;
 }
 
 // ---- resolve the single Litecoin mainnet chain ----------------------------
 
-$net = ts_net_default();
+$net = lx_net_default();
 if ($net === null) {
     // Degenerate (no network enabled): still answer /api requests as an API error
     // (text) rather than the HTML 404 page.
     if (($segs[0] ?? '') === 'api') {
-        define('TS_WANTS_JSON', true);
+        define('LX_WANTS_JSON', true);
     }
-    ts_not_found($method);
+    lx_not_found($method);
 }
 
 // Root-level routing: every path segment is part of the resource path (there is
@@ -73,18 +73,18 @@ $rest = $segs;
 // ---- API vs HTML ----------------------------------------------------------
 
 if (isset($rest[0]) && $rest[0] === 'api') {
-    define('TS_WANTS_JSON', true);
+    define('LX_WANTS_JSON', true);
     // CORS preflight must always succeed.
     if ($method === 'OPTIONS') {
         http_response_code(204);
-        ts_cors();
+        lx_cors();
         exit;
     }
-    ts_route_api($net, array_slice($rest, 1), $method);
+    lx_route_api($net, array_slice($rest, 1), $method);
     exit;
 }
 
-ts_route_html($net, $rest, $method);
+lx_route_html($net, $rest, $method);
 exit;
 
 
@@ -92,7 +92,7 @@ exit;
 //  HTML routing
 // ===========================================================================
 
-function ts_route_html(array $net, array $rest, string $method): void
+function lx_route_html(array $net, array $rest, string $method): void
 {
     $page = $rest[0] ?? '';
 
@@ -125,15 +125,15 @@ function ts_route_html(array $net, array $rest, string $method): void
             // Accept a bare height at /block/<n> too (mempool.space parity), not
             // just a 64-hex hash; resolve it and redirect to the canonical hash URL.
             if (ctype_digit($ref)) {
-                $hash = ts_block_hash_at($net, (int) $ref);
+                $hash = lx_block_hash_at($net, (int) $ref);
                 if ($hash === null) {
-                    ts_not_found($method);
+                    lx_not_found($method);
                 }
-                header('Location: ' . ts_net_url($net) . '/block/' . $hash, true, 302);
+                header('Location: ' . lx_net_url($net) . '/block/' . $hash, true, 302);
                 return;
             }
             if (!is_txid($ref)) {
-                ts_not_found($method);
+                lx_not_found($method);
             }
             $GLOBALS['block_hash'] = $ref;
             $GLOBALS['block_page'] = isset($rest[2]) && ctype_digit($rest[2]) ? (int) $rest[2] : 0;
@@ -143,19 +143,19 @@ function ts_route_html(array $net, array $rest, string $method): void
         case 'block-height':
             $h = $rest[1] ?? '';
             if (!ctype_digit($h)) {
-                ts_not_found($method);
+                lx_not_found($method);
             }
-            $hash = ts_block_hash_at($net, (int) $h);
+            $hash = lx_block_hash_at($net, (int) $h);
             if ($hash === null) {
-                ts_not_found($method);
+                lx_not_found($method);
             }
-            header('Location: ' . ts_net_url($net) . '/block/' . $hash, true, 302);
+            header('Location: ' . lx_net_url($net) . '/block/' . $hash, true, 302);
             return;
 
         case 'tx':
             $txid = $rest[1] ?? '';
             if (!is_txid($txid)) {
-                ts_not_found($method);
+                lx_not_found($method);
             }
             $GLOBALS['txid'] = $txid;
             $view = 'tx';
@@ -163,8 +163,8 @@ function ts_route_html(array $net, array $rest, string $method): void
 
         case 'address':
             $addr = $rest[1] ?? '';
-            if ($addr === '' || !ts_address_valid($net, $addr)) {
-                ts_not_found($method);
+            if ($addr === '' || !lx_address_valid($net, $addr)) {
+                lx_not_found($method);
             }
             $GLOBALS['address'] = $addr;
             $view = 'address';
@@ -172,12 +172,12 @@ function ts_route_html(array $net, array $rest, string $method): void
 
         case 'xpub':
             $xp = $rest[1] ?? '';
-            if ($xp === '' || !ts_is_xpub($xp)) {
-                ts_not_found($method);
+            if ($xp === '' || !lx_is_xpub($xp)) {
+                lx_not_found($method);
             }
             // Each unique key is ~22 EC mults + up to 20 Electrum round-trips and
             // always misses the per-key cache, so throttle per IP (anti-amplification).
-            if (!ts_rate_limit('xpub', 20, 60)) {
+            if (!lx_rate_limit('xpub', 20, 60)) {
                 http_response_code(429);
                 header('Retry-After: 30');
                 header('Cache-Control: no-store');
@@ -198,13 +198,13 @@ function ts_route_html(array $net, array $rest, string $method): void
         case 'tv':
             // TV / wall-display mode was removed - no real audience, and even
             // mempool.space retired its /tv. Redirect old links home instead of 404ing.
-            header('Location: ' . ts_net_url($net) . '/', true, 302);
+            header('Location: ' . lx_net_url($net) . '/', true, 302);
             return;
 
         case 'mempool-block':
             $mb = $rest[1] ?? '';
             if (!ctype_digit($mb)) {
-                ts_not_found($method);
+                lx_not_found($method);
             }
             $GLOBALS['mempool_block_index'] = (int) $mb;
             $view = 'mempool-block';
@@ -244,7 +244,7 @@ function ts_route_html(array $net, array $rest, string $method): void
             break;
 
         case 'search':
-            ts_handle_search($net, $method);
+            lx_handle_search($net, $method);
             return;
 
         case 'mweb':
@@ -252,25 +252,25 @@ function ts_route_html(array $net, array $rest, string $method): void
             break;
 
         default:
-            ts_not_found($method);
+            lx_not_found($method);
     }
 
     require __DIR__ . '/views/' . $view . '.php';
 }
 
 /** Resolve a search query (?q=) to the right page and redirect. */
-function ts_handle_search(array $net, string $method): void
+function lx_handle_search(array $net, string $method): void
 {
     $q = trim($_GET['q'] ?? $_POST['q'] ?? '');
     if (strlen($q) > 120) { $q = substr($q, 0, 120); }   // no height/txid/address is longer; bounds work
-    $base = ts_net_url($net);
+    $base = lx_net_url($net);
     if ($q === '') {
         header('Location: ' . $base . '/', true, 302);
         return;
     }
     // A 64-hex query triggers uncached negative lookups (getblockheader + tx). Throttle so
     // /search can't be used as an RPC/electrs amplifier (the tx path is also negative-cached).
-    if (function_exists('ts_rate_limit') && !ts_rate_limit('search', 60, 60)) {
+    if (function_exists('lx_rate_limit') && !lx_rate_limit('search', 60, 60)) {
         http_response_code(429);
         header('Retry-After: 10');
         header('Content-Type: text/plain; charset=utf-8');
@@ -279,7 +279,7 @@ function ts_handle_search(array $net, string $method): void
     }
     // height
     if (ctype_digit($q)) {
-        $hash = ts_block_hash_at($net, (int) $q);
+        $hash = lx_block_hash_at($net, (int) $q);
         if ($hash !== null) {
             header('Location: ' . $base . '/block/' . $hash, true, 302);
             return;
@@ -287,23 +287,23 @@ function ts_handle_search(array $net, string $method): void
     }
     // 64-hex: block hash or txid (verify it exists before redirecting)
     if (is_txid($q)) {
-        if (ts_rpc_soft($net, 'getblockheader', [$q, true]) !== null) {
+        if (lx_rpc_soft($net, 'getblockheader', [$q, true]) !== null) {
             header('Location: ' . $base . '/block/' . $q, true, 302);
             return;
         }
-        if (ts_find_tx($net, $q) !== null) {
+        if (lx_find_tx($net, $q) !== null) {
             header('Location: ' . $base . '/tx/' . $q, true, 302);
             return;
         }
         // 64-hex but neither a block nor a known tx -> fall through to not-found
     }
     // extended public key (xpub/ypub/zpub, testnet tpub/upub/vpub, Litecoin) -> derived addresses
-    if (ts_is_xpub($q)) {
+    if (lx_is_xpub($q)) {
         header('Location: ' . $base . '/xpub/' . rawurlencode($q), true, 302);
         return;
     }
     // address
-    if (ts_address_valid($net, $q)) {
+    if (lx_address_valid($net, $q)) {
         header('Location: ' . $base . '/address/' . rawurlencode($q), true, 302);
         return;
     }
@@ -312,9 +312,9 @@ function ts_handle_search(array $net, string $method): void
     require __DIR__ . '/views/notfound.php';
 }
 
-function ts_not_found(string $method): void
+function lx_not_found(string $method): void
 {
-    if (defined('TS_WANTS_JSON') && TS_WANTS_JSON) {
+    if (defined('LX_WANTS_JSON') && LX_WANTS_JSON) {
         api_error('Not found', 404);
     }
     http_response_code(404);
@@ -329,12 +329,12 @@ function ts_not_found(string $method): void
 
 /**
  * HTTP max-age for an Esplora tx body. Mirrors the server-side cache gate in
- * ts_cache_tx_if_confirmed: uncacheable while unconfirmed (or height unknown), a
+ * lx_cache_tx_if_confirmed: uncacheable while unconfirmed (or height unknown), a
  * short window while shallow (a reorg could still change it), long-lived once
  * buried past 100 confirmations. Confirmed-but-shallow txs get a bounded TTL so
  * an edge/browser never serves a reorged confirmation as permanent.
  */
-function ts_tx_http_ttl(array $net, array $tx): int
+function lx_tx_http_ttl(array $net, array $tx): int
 {
     if (empty($tx['status']['confirmed'])) {
         return 0;
@@ -343,15 +343,15 @@ function ts_tx_http_ttl(array $net, array $tx): int
     if ($bh === null) {
         return 0;
     }
-    return (ts_tip_height($net) - (int) $bh) > 100 ? 86400 : 600;
+    return (lx_tip_height($net) - (int) $bh) > 100 ? 86400 : 600;
 }
 
-function ts_route_api(array $net, array $r, string $method): void
+function lx_route_api(array $net, array $r, string $method): void
 {
     // CORS preflight
     if ($method === 'OPTIONS') {
         http_response_code(204);
-        ts_cors();
+        lx_cors();
         exit;
     }
 
@@ -361,10 +361,10 @@ function ts_route_api(array $net, array $r, string $method): void
     if ($a === 'tx' && $method === 'POST' && !isset($r[1])) {
         // Throttle: each broadcast forwards up to ~1 MiB of hex to the node for a full
         // parse/validate, so cap per-IP to blunt a resource-amplification flood.
-        if (function_exists('ts_rate_limit') && !ts_rate_limit('broadcast', 30, 60)) {
+        if (function_exists('lx_rate_limit') && !lx_rate_limit('broadcast', 30, 60)) {
             api_error('rate limited', 429);
         }
-        [$txid, $err] = ts_broadcast($net, request_body());
+        [$txid, $err] = lx_broadcast($net, request_body());
         if ($txid !== null) {
             text_out($txid);
         }
@@ -383,21 +383,21 @@ function ts_route_api(array $net, array $r, string $method): void
         case 'blocks':
             if (($r[1] ?? '') === 'tip') {
                 if (($r[2] ?? '') === 'height') {
-                    text_out((string) ts_tip_height($net), 200, 'text/plain', 5);
+                    text_out((string) lx_tip_height($net), 200, 'text/plain', 5);
                 }
                 if (($r[2] ?? '') === 'hash') {
-                    text_out(ts_tip_hash($net), 200, 'text/plain', 5);
+                    text_out(lx_tip_hash($net), 200, 'text/plain', 5);
                 }
                 if (($r[2] ?? '') === '') {
                     // bare /blocks/tip -> tip block object (mempool.space compat)
-                    $blk = ts_esplora_block($net, ts_tip_hash($net));
+                    $blk = lx_esplora_block($net, lx_tip_hash($net));
                     $blk ? json_out($blk) : api_error('Not found', 404);
                 }
                 api_error('Not found', 404);
             }
             // /blocks or /blocks/:start_height
             $start = isset($r[1]) && ctype_digit($r[1]) ? (int) $r[1] : null;
-            json_out(ts_recent_blocks($net, $start));
+            json_out(lx_recent_blocks($net, $start));
             // no break (json_out exits)
 
         // ---- block-height -------------------------------------------------
@@ -406,7 +406,7 @@ function ts_route_api(array $net, array $r, string $method): void
             if (!ctype_digit($h)) {
                 api_error('Invalid height', 400);
             }
-            $hash = ts_block_hash_at($net, (int) $h);
+            $hash = lx_block_hash_at($net, (int) $h);
             if ($hash === null) {
                 api_error('Block not found', 404);
             }
@@ -422,20 +422,20 @@ function ts_route_api(array $net, array $r, string $method): void
             // A block's body/txids/header/raw are immutable per hash (chain
             // membership lives only in /status), so they carry a long max-age.
             if ($sub === '') {
-                $blk = ts_esplora_block($net, $hash);
+                $blk = lx_esplora_block($net, $hash);
                 $blk ? json_out($blk, 200, 86400) : api_error('Block not found', 404);
             }
             if ($sub === 'status') {
-                $st = ts_block_status($net, $hash);   // mutable: reorg can flip it
+                $st = lx_block_status($net, $hash);   // mutable: reorg can flip it
                 $st ? json_out($st) : api_error('Block not found', 404);
             }
             if ($sub === 'txids') {
-                $ids = ts_block_txids($net, $hash);
+                $ids = lx_block_txids($net, $hash);
                 $ids !== null ? json_out($ids, 200, 86400) : api_error('Block not found', 404);
             }
             if ($sub === 'txid') {
                 $idx = $r[3] ?? '';
-                $ids = ts_block_txids($net, $hash);
+                $ids = lx_block_txids($net, $hash);
                 if ($ids === null || !ctype_digit($idx) || !isset($ids[(int) $idx])) {
                     api_error('Not found', 404);
                 }
@@ -444,24 +444,24 @@ function ts_route_api(array $net, array $r, string $method): void
             if ($sub === 'txs') {
                 $startIdx = isset($r[3]) && ctype_digit($r[3]) ? (int) $r[3] : 0;
                 $startIdx -= $startIdx % 25; // Esplora pages on multiples of 25
-                $txs = ts_block_txs($net, $hash, $startIdx);
+                $txs = lx_block_txs($net, $hash, $startIdx);
                 if ($txs === null) {
                     api_error('Block not found', 404);
                 }
                 // Embeds per-tx confirmation state, so gate the long TTL on
                 // best-chain membership AND burial depth: an orphaned (or
                 // unconfirmable) block never gets the immutable 24h max-age.
-                $bst = ts_block_status($net, $hash);
+                $bst = lx_block_status($net, $hash);
                 $ttl = ($bst !== null && !empty($bst['in_best_chain'])
-                        && (ts_tip_height($net) - (int) $bst['height']) > 100) ? 86400 : 600;
+                        && (lx_tip_height($net) - (int) $bst['height']) > 100) ? 86400 : 600;
                 json_out($txs, 200, $ttl);
             }
             if ($sub === 'header') {
-                $hdr = ts_rpc_soft($net, 'getblockheader', [$hash, false]);
+                $hdr = lx_rpc_soft($net, 'getblockheader', [$hash, false]);
                 is_string($hdr) ? text_out($hdr, 200, 'text/plain', 86400) : api_error('Block not found', 404);
             }
             if ($sub === 'raw') {
-                $raw = ts_rpc_soft($net, 'getblock', [$hash, 0]);
+                $raw = lx_rpc_soft($net, 'getblock', [$hash, 0]);
                 if (!is_string($raw)) {
                     api_error('Block not found', 404);
                 }
@@ -477,55 +477,55 @@ function ts_route_api(array $net, array $r, string $method): void
             }
             $sub = $r[2] ?? '';
             if ($sub === '') {
-                $tx = ts_find_tx($net, $txid);
-                $tx ? json_out($tx, 200, ts_tx_http_ttl($net, $tx)) : api_error('Transaction not found', 404);
+                $tx = lx_find_tx($net, $txid);
+                $tx ? json_out($tx, 200, lx_tx_http_ttl($net, $tx)) : api_error('Transaction not found', 404);
             }
             if ($sub === 'hex') {
                 // Raw bytes are immutable per txid regardless of confirmation.
-                $hex = ts_find_tx_hex($net, $txid);
+                $hex = lx_find_tx_hex($net, $txid);
                 $hex !== null ? text_out($hex, 200, 'text/plain', 86400) : api_error('Transaction not found', 404);
             }
             if ($sub === 'raw') {
-                $hex = ts_find_tx_hex($net, $txid);
+                $hex = lx_find_tx_hex($net, $txid);
                 $hex !== null
                     ? text_out(hex2bin($hex), 200, 'application/octet-stream', 86400)
                     : api_error('Transaction not found', 404);
             }
             if ($sub === 'status') {
-                $tx = ts_find_tx($net, $txid);
+                $tx = lx_find_tx($net, $txid);
                 $tx ? json_out($tx['status']) : api_error('Transaction not found', 404);
             }
             if ($sub === 'outspends') {
                 // Expensive (resolves the spender of every spent output); throttle hardest.
-                if (!ts_rate_limit('outspends_batch', 30, 60)) { api_error('rate limited', 429); }
-                $tx = ts_find_tx($net, $txid);
-                $tx ? json_out(ts_tx_outspends($net, $tx)) : api_error('Transaction not found', 404);
+                if (!lx_rate_limit('outspends_batch', 30, 60)) { api_error('rate limited', 429); }
+                $tx = lx_find_tx($net, $txid);
+                $tx ? json_out(lx_tx_outspends($net, $tx)) : api_error('Transaction not found', 404);
             }
             if ($sub === 'outspend') {
                 // Single output + bounded resolve; generous cap so a swap maker polling its
                 // HTLC output isn't throttled (and a 429 just makes it retry - no fund risk).
-                if (!ts_rate_limit('outspend_one', 180, 60)) { api_error('rate limited', 429); }
-                $tx = ts_find_tx($net, $txid);
+                if (!lx_rate_limit('outspend_one', 180, 60)) { api_error('rate limited', 429); }
+                $tx = lx_find_tx($net, $txid);
                 $n = $r[3] ?? '';
                 if (!$tx || !ctype_digit($n) || !isset($tx['vout'][(int) $n])) {
                     api_error('Not found', 404);
                 }
-                json_out(ts_tx_outspend($net, $tx, (int) $n));
+                json_out(lx_tx_outspend($net, $tx, (int) $n));
             }
             if ($sub === 'merkle-proof') {
-                $tx = ts_find_tx($net, $txid);
+                $tx = lx_find_tx($net, $txid);
                 if (!$tx || empty($tx['status']['confirmed'])) {
                     api_error('Transaction not confirmed', 404);
                 }
-                $mp = ts_tx_merkle($net, $txid, (int) $tx['status']['block_height']);
+                $mp = lx_tx_merkle($net, $txid, (int) $tx['status']['block_height']);
                 $mp ? json_out($mp) : api_error('Not available', 404);
             }
             if ($sub === 'merkleblock-proof') {
-                $tx = ts_find_tx($net, $txid);
+                $tx = lx_find_tx($net, $txid);
                 if (!$tx || empty($tx['status']['confirmed'])) {
                     api_error('Transaction not confirmed', 404);
                 }
-                $mb = ts_merkleblock_proof($net, $txid, $tx['status']['block_hash'] ?? null);
+                $mb = lx_merkleblock_proof($net, $txid, $tx['status']['block_hash'] ?? null);
                 $mb !== null ? text_out($mb) : api_error('Not available', 404);
             }
             api_error('Not found', 404);
@@ -533,32 +533,32 @@ function ts_route_api(array $net, array $r, string $method): void
         // ---- address ------------------------------------------------------
         case 'address':
             $addr = $r[1] ?? '';
-            if ($addr === '' || !ts_address_valid($net, $addr)) {
+            if ($addr === '' || !lx_address_valid($net, $addr)) {
                 api_error('Invalid address', 400);
             }
             // Address is already validated above, so a null result here means the Electrum
             // index is unavailable (down / resyncing) - return 503, never a false empty/zero.
             $sub = $r[2] ?? '';
             if ($sub === '') {
-                $st = ts_address_stats($net, $addr);
+                $st = lx_address_stats($net, $addr);
                 $st !== null ? json_out($st) : api_error('Address index unavailable', 503);
             }
             if ($sub === 'txs') {
                 $kind = $r[3] ?? '';
                 if ($kind === 'mempool') {
-                    $t = ts_address_txs($net, $addr, 'mempool');
+                    $t = lx_address_txs($net, $addr, 'mempool');
                     $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
                 }
                 if ($kind === 'chain') {
                     $after = $r[4] ?? null;
-                    $t = ts_address_txs($net, $addr, 'chain', $after);
+                    $t = lx_address_txs($net, $addr, 'chain', $after);
                     $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
                 }
-                $t = ts_address_txs($net, $addr, 'all');
+                $t = lx_address_txs($net, $addr, 'all');
                 $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
             }
             if ($sub === 'utxo') {
-                $u = ts_address_utxos($net, $addr);
+                $u = lx_address_utxos($net, $addr);
                 $u !== null ? json_out($u, 200, 5) : api_error('Address index unavailable', 503);
             }
             api_error('Not found', 404);
@@ -573,24 +573,24 @@ function ts_route_api(array $net, array $r, string $method): void
             $sub = $r[2] ?? '';
             // null result = electrs unavailable (down / resyncing) -> 503, never a fake empty.
             if ($sub === '') {
-                $st = ts_scripthash_stats($net, $sh);
+                $st = lx_scripthash_stats($net, $sh);
                 $st !== null ? json_out($st) : api_error('Address index unavailable', 503);
             }
             if ($sub === 'txs') {
                 $kind = $r[3] ?? '';
                 if ($kind === 'mempool') {
-                    $t = ts_scripthash_txs($net, $sh, 'mempool');
+                    $t = lx_scripthash_txs($net, $sh, 'mempool');
                     $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
                 }
                 if ($kind === 'chain') {
-                    $t = ts_scripthash_txs($net, $sh, 'chain', $r[4] ?? null);
+                    $t = lx_scripthash_txs($net, $sh, 'chain', $r[4] ?? null);
                     $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
                 }
-                $t = ts_scripthash_txs($net, $sh, 'all');
+                $t = lx_scripthash_txs($net, $sh, 'all');
                 $t !== null ? json_out($t) : api_error('Address index unavailable', 503);
             }
             if ($sub === 'utxo') {
-                $u = ts_scripthash_utxos($net, $sh);
+                $u = lx_scripthash_utxos($net, $sh);
                 $u !== null ? json_out($u, 200, 5) : api_error('Address index unavailable', 503);
             }
             api_error('Not found', 404);
@@ -599,129 +599,129 @@ function ts_route_api(array $net, array $r, string $method): void
         case 'mempool':
             $sub = $r[1] ?? '';
             if ($sub === '') {
-                json_out(ts_esplora_mempool($net), 200, 5);
+                json_out(lx_esplora_mempool($net), 200, 5);
             }
             if ($sub === 'txids') {
-                json_out(ts_mempool_txids($net));
+                json_out(lx_mempool_txids($net));
             }
             if ($sub === 'recent') {
-                json_out(ts_mempool_recent($net), 200, 5);
+                json_out(lx_mempool_recent($net), 200, 5);
             }
             api_error('Not found', 404);
 
         // ---- fees ---------------------------------------------------------
         case 'fee-estimates':
-            json_out(ts_fee_estimates($net), 200, 60);
+            json_out(lx_fee_estimates($net), 200, 60);
 
         case 'v1':
             if (($r[1] ?? '') === 'fees' && ($r[2] ?? '') === 'recommended') {
-                json_out(ts_fees_recommended($net));
+                json_out(lx_fees_recommended($net));
             }
             if (($r[1] ?? '') === 'fees' && ($r[2] ?? '') === 'mempool-blocks') {
-                json_out(ts_mempool_blocks_api($net), 200, 5);
+                json_out(lx_mempool_blocks_api($net), 200, 5);
             }
             if (($r[1] ?? '') === 'prices') {
-                json_out(ts_prices_api($net), 200, 60);
+                json_out(lx_prices_api($net), 200, 60);
             }
             if (($r[1] ?? '') === 'validate-address') {
                 $addr = $r[2] ?? '';
-                json_out(ts_validate_address($net, $addr));
+                json_out(lx_validate_address($net, $addr));
             }
             if (($r[1] ?? '') === 'difficulty-adjustment') {
-                json_out(ts_difficulty_adjustment($net));
+                json_out(lx_difficulty_adjustment($net));
             }
             if (($r[1] ?? '') === 'difficulty-history') {
-                json_out(ts_difficulty_epochs($net, 24), 200, 300);
+                json_out(lx_difficulty_epochs($net, 24), 200, 300);
             }
             if (($r[1] ?? '') === 'statistics') {
-                json_out(ts_statistics_api($net), 200, 30);
+                json_out(lx_statistics_api($net), 200, 30);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'pools') {
-                json_out(ts_mining_pools_api($net), 200, 120);
+                json_out(lx_mining_pools_api($net), 200, 120);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'hashrate' && ($r[3] ?? '') !== 'pools') {
                 $per = (string) ($r[3] ?? '');
-                if ($per !== '' && !ts_period_valid($per)) { api_error('Invalid time period', 400); }
-                json_out(ts_mining_hashrate_api($net, $per), 200, 120);
+                if ($per !== '' && !lx_period_valid($per)) { api_error('Invalid time period', 400); }
+                json_out(lx_mining_hashrate_api($net, $per), 200, 120);
             }
             // Mining block-analytics timeseries (bucketed, from the block index).
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'blocks'
                 && in_array($r[3] ?? '', ['fees', 'rewards', 'fee-rates', 'sizes-weights'], true)) {
                 $per = (string) ($r[4] ?? '1w');
-                if (!ts_period_valid($per)) { api_error('Invalid time period', 400); }
+                if (!lx_period_valid($per)) { api_error('Invalid time period', 400); }
                 switch ($r[3]) {
-                    case 'fees':          json_out(ts_mining_blocks_fees_api($net, $per), 200, 600);
-                    case 'rewards':       json_out(ts_mining_blocks_rewards_api($net, $per), 200, 600);
-                    case 'fee-rates':     json_out(ts_mining_blocks_feerates_api($net, $per), 200, 600);
-                    case 'sizes-weights': json_out(ts_mining_blocks_sizesweights_api($net, $per), 200, 600);
+                    case 'fees':          json_out(lx_mining_blocks_fees_api($net, $per), 200, 600);
+                    case 'rewards':       json_out(lx_mining_blocks_rewards_api($net, $per), 200, 600);
+                    case 'fee-rates':     json_out(lx_mining_blocks_feerates_api($net, $per), 200, 600);
+                    case 'sizes-weights': json_out(lx_mining_blocks_sizesweights_api($net, $per), 200, 600);
                 }
             }
             // Nearest block to a unix timestamp.
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'blocks' && ($r[3] ?? '') === 'timestamp') {
                 if (!ctype_digit((string) ($r[4] ?? ''))) { api_error('Invalid timestamp', 400); }
-                $bt = ts_block_by_timestamp_api($net, (int) $r[4]);
+                $bt = lx_block_by_timestamp_api($net, (int) $r[4]);
                 $bt ? json_out($bt, 200, 60) : api_error('Not found', 404);
             }
             // BlockExtended range / recent (with pool + reward extras). These walk many blocks
             // (getblockstats + pool per height) on a cold range, so throttle a range-sweep.
             if (($r[1] ?? '') === 'blocks-bulk') {
                 if (!ctype_digit((string) ($r[2] ?? '')) || !ctype_digit((string) ($r[3] ?? ''))) { api_error('Invalid range', 400); }
-                if (function_exists('ts_rate_limit') && !ts_rate_limit('blocks_bulk', 60, 60)) { api_error('rate limited', 429); }
-                json_out(ts_blocks_bulk_api($net, (int) $r[2], (int) $r[3]), 200, 60);
+                if (function_exists('lx_rate_limit') && !lx_rate_limit('blocks_bulk', 60, 60)) { api_error('rate limited', 429); }
+                json_out(lx_blocks_bulk_api($net, (int) $r[2], (int) $r[3]), 200, 60);
             }
             if (($r[1] ?? '') === 'blocks') {
-                if (function_exists('ts_rate_limit') && !ts_rate_limit('v1_blocks', 120, 60)) { api_error('rate limited', 429); }
+                if (function_exists('lx_rate_limit') && !lx_rate_limit('v1_blocks', 120, 60)) { api_error('rate limited', 429); }
                 $start = (($r[2] ?? '') !== '' && ctype_digit((string) $r[2])) ? (int) $r[2] : null;
-                json_out(ts_blocks_extended_api($net, $start), 200, 10);
+                json_out(lx_blocks_extended_api($net, $start), 200, 10);
             }
             if (($r[1] ?? '') === 'backend-info') {
-                json_out(ts_backend_info_api($net), 200, 60);
+                json_out(lx_backend_info_api($net), 200, 60);
             }
             if (($r[1] ?? '') === 'transaction-times') {
-                json_out(ts_transaction_times_api($net), 200, 5);
+                json_out(lx_transaction_times_api($net), 200, 5);
             }
             if (($r[1] ?? '') === 'fullrbf' && ($r[2] ?? '') === 'replacements') {
-                json_out(ts_replacements_api($net), 200, 2);   // we don't segregate fullRBF; return all replacements
+                json_out(lx_replacements_api($net), 200, 2);   // we don't segregate fullRBF; return all replacements
             }
             if (($r[1] ?? '') === 'cpfp') {
                 if (!is_txid($r[2] ?? '')) { api_error('Invalid txid', 400); }
-                json_out(ts_cpfp_api($net, $r[2]), 200, 5);
+                json_out(lx_cpfp_api($net, $r[2]), 200, 5);
             }
             if (($r[1] ?? '') === 'tx' && ($r[3] ?? '') === 'rbf') {
                 if (!is_txid($r[2] ?? '')) { api_error('Invalid txid', 400); }
-                json_out(ts_rbf_tx_api($net, $r[2]), 200, 2);
+                json_out(lx_rbf_tx_api($net, $r[2]), 200, 2);
             }
             if (($r[1] ?? '') === 'replacements') {
-                json_out(ts_replacements_api($net), 200, 2);
+                json_out(lx_replacements_api($net), 200, 2);
             }
             if (($r[1] ?? '') === 'block' && ($r[3] ?? '') === 'audit-summary') {
                 if (!is_txid($r[2] ?? '')) { api_error('Invalid block hash', 400); }
-                $as = ts_audit_summary_api($net, $r[2]);
+                $as = lx_audit_summary_api($net, $r[2]);
                 $as ? json_out($as, 200, 600) : api_error('Not found', 404);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'hashrate' && ($r[3] ?? '') === 'pools') {
                 $per = (string) ($r[4] ?? '1w');
-                if (!ts_period_valid($per)) { api_error('Invalid time period', 400); }
-                json_out(ts_mining_hashrate_pools_api($net, $per), 200, 300);
+                if (!lx_period_valid($per)) { api_error('Invalid time period', 400); }
+                json_out(lx_mining_hashrate_pools_api($net, $per), 200, 300);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'pool') {
                 $slug = (string) ($r[3] ?? '');
                 if ($slug === '') { api_error('Not found', 404); }
-                if (($r[4] ?? '') === 'hashrate') { json_out(ts_mining_pool_hashrate_api($net, $slug), 200, 300); }
+                if (($r[4] ?? '') === 'hashrate') { json_out(lx_mining_pool_hashrate_api($net, $slug), 200, 300); }
                 if (($r[4] ?? '') === 'blocks') {
                     $before = (($r[5] ?? '') !== '' && ctype_digit((string) $r[5])) ? (int) $r[5] : null;
-                    json_out(ts_mining_pool_blocks_api($net, $slug, $before), 200, 60);
+                    json_out(lx_mining_pool_blocks_api($net, $slug, $before), 200, 60);
                 }
-                json_out(ts_mining_pool_api($net, $slug), 200, 120);
+                json_out(lx_mining_pool_api($net, $slug), 200, 120);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'reward-stats') {
-                json_out(ts_reward_stats_api($net, (int) ($r[3] ?? 144)), 200, 120);
+                json_out(lx_reward_stats_api($net, (int) ($r[3] ?? 144)), 200, 120);
             }
             if (($r[1] ?? '') === 'mining' && ($r[2] ?? '') === 'difficulty-adjustments') {
-                json_out(ts_difficulty_adjustments_api($net, (string) ($r[3] ?? '1y')), 200, 1800);
+                json_out(lx_difficulty_adjustments_api($net, (string) ($r[3] ?? '1y')), 200, 1800);
             }
             if (($r[1] ?? '') === 'historical-price') {
-                json_out(ts_historical_price_api($net), 200, 300);
+                json_out(lx_historical_price_api($net), 200, 300);
             }
             if (($r[1] ?? '') === 'ws') {
                 // Real WS traffic is proxied to the daemon (tools/ws-server.php) by Apache
@@ -738,12 +738,12 @@ function ts_route_api(array $net, array $r, string $method): void
 
         // ---- MWEB (Litecoin only, read-only) ------------------------------
         case 'mweb':
-            if (!ts_mweb_enabled($net)) {
+            if (!lx_mweb_enabled($net)) {
                 api_error('Not found', 404);
             }
             $sub = $r[1] ?? 'tip';
             if ($sub === 'tip' || $sub === '') {
-                json_out(ts_mweb_active($net), 200, 2);
+                json_out(lx_mweb_active($net), 200, 2);
             }
             if ($sub === 'blocks') {
                 $from = max(0, (int) ($_GET['from'] ?? 0));
@@ -751,41 +751,41 @@ function ts_route_api(array $net, array $r, string $method): void
                 if ($to < $from) {
                     api_error('to < from', 400);
                 }
-                json_out(ts_mweb_range($net, $from, $to), 200, 30);
+                json_out(lx_mweb_range($net, $from, $to), 200, 30);
             }
             if ($sub === 'block' && isset($r[2]) && is_txid($r[2])) {
-                $m = ts_mweb_block($net, $r[2]);
+                $m = lx_mweb_block($net, $r[2]);
                 $m ? json_out($m) : api_error('Not found', 404);
             }
             // Indexed history (empty payloads when the index is absent, never an error).
             if ($sub === 'pegins') {
                 $before = isset($_GET['before']) && is_string($_GET['before']) ? $_GET['before'] : null;
                 $limit  = max(1, min(100, (int) ($_GET['limit'] ?? 50)));
-                json_out(ts_mweb_pegins_page($net, $before, $limit), 200, 15);
+                json_out(lx_mweb_pegins_page($net, $before, $limit), 200, 15);
             }
             if ($sub === 'pegouts') {
                 $before = isset($_GET['before']) && is_string($_GET['before']) ? $_GET['before'] : null;
                 $limit  = max(1, min(100, (int) ($_GET['limit'] ?? 50)));
-                json_out(ts_mweb_pegouts_page($net, $before, $limit), 200, 15);
+                json_out(lx_mweb_pegouts_page($net, $before, $limit), 200, 15);
             }
             if ($sub === 'supply') {
                 $limit = max(1, min(2000, (int) ($_GET['limit'] ?? 400)));
-                json_out(['series' => ts_mweb_supply_series($net, $limit)], 200, 30);
+                json_out(['series' => lx_mweb_supply_series($net, $limit)], 200, 30);
             }
             if ($sub === 'clusters') {
                 $limit = max(1, min(100, (int) ($_GET['limit'] ?? 15)));
-                json_out(['clusters' => ts_mweb_pegout_clusters($net, $limit)], 200, 60);
+                json_out(['clusters' => lx_mweb_pegout_clusters($net, $limit)], 200, 60);
             }
             // Composed snapshot for the live peg-flow hero (supply + recent block pegs
             // + round-trip links in one poll). Sub-calls are individually cached.
             if ($sub === 'live') {
-                json_out(ts_mweb_live_snapshot($net), 200, 10);
+                json_out(lx_mweb_live_snapshot($net), 200, 10);
             }
             api_error('Not found', 404);
 
         // ---- health -------------------------------------------------------
         case 'health':
-            $hz = ts_health($net);
+            $hz = lx_health($net);
             json_out($hz, empty($hz['ok']) ? 503 : 200);
 
         default:

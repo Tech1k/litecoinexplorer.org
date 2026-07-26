@@ -28,13 +28,13 @@ if ($src === '' || !is_file($src)) {
     fwrite(STDERR, "usage: php tools/mweb-seed.php <net-slug> <mwebscan.db path>\n");
     exit(1);
 }
-$net = ts_net($slug);
-if (!$net || !ts_mweb_enabled($net)) {
+$net = lx_net($slug);
+if (!$net || !lx_mweb_enabled($net)) {
     fwrite(STDERR, "network '$slug' unknown or MWEB not enabled for it\n");
     exit(1);
 }
 
-$db = ts_mweb_index_pdo($net, true);   // create schema
+$db = lx_mweb_index_pdo($net, true);   // create schema
 if (!$db) {
     fwrite(STDERR, "could not open index DB (check mweb.index.db in config)\n");
     exit(1);

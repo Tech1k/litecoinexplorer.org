@@ -21,24 +21,24 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-/** ~1 vMB, matching the projected-block CAP in ts_projected_blocks(). */
-if (!defined('TS_AUDIT_CAP')) {
-    define('TS_AUDIT_CAP', 1000000);
+/** ~1 vMB, matching the projected-block CAP in lx_projected_blocks(). */
+if (!defined('LX_AUDIT_CAP')) {
+    define('LX_AUDIT_CAP', 1000000);
 }
 
-function ts_audit_db_path(): ?string
+function lx_audit_db_path(): ?string
 {
-    $cache = ts_config()['cache_db'] ?? null;
+    $cache = lx_config()['cache_db'] ?? null;
     return $cache ? dirname($cache) . '/audit.sqlite' : null;
 }
 
-function ts_audit_pdo(bool $create = false): ?PDO
+function lx_audit_pdo(bool $create = false): ?PDO
 {
     static $pdo = false;
     if ($pdo !== false) {
         return $pdo;
     }
-    $path = ts_audit_db_path();
+    $path = lx_audit_db_path();
     if (!$path) {
         return $pdo = null;
     }
@@ -83,12 +83,12 @@ function ts_audit_pdo(bool $create = false): ?PDO
 
 /**
  * The predicted next-block transaction id set: the highest-fee-rate mempool
- * transactions packed until ~1 vMB is reached (the same rule ts_projected_blocks
+ * transactions packed until ~1 vMB is reached (the same rule lx_projected_blocks
  * uses for its first column). Returns ['txids' => string[], 'vsize' => int].
  */
-function ts_audit_projected_txids(array $net): array
+function lx_audit_projected_txids(array $net): array
 {
-    $verbose = ts_mempool_verbose($net);
+    $verbose = lx_mempool_verbose($net);
     if (!$verbose) {
         return ['txids' => [], 'vsize' => 0];
     }
@@ -105,13 +105,13 @@ function ts_audit_projected_txids(array $net): array
         return $b['rate'] <=> $a['rate'];   // highest fee rate first
     });
     if (count($rows) > 4000) {
-        $rows = array_slice($rows, 0, 4000);   // match ts_mempool_txfees' cap so the snapshot matches the shown next block
+        $rows = array_slice($rows, 0, 4000);   // match lx_mempool_txfees' cap so the snapshot matches the shown next block
     }
     $ids = [];
     $acc = 0;
     $fees = 0;
     foreach ($rows as $r) {
-        if ($acc >= TS_AUDIT_CAP) {
+        if ($acc >= LX_AUDIT_CAP) {
             break;
         }
         $ids[] = $r['txid'];
@@ -125,15 +125,15 @@ function ts_audit_projected_txids(array $net): array
  * Capture one snapshot of the predicted next block for $net (called by the
  * cron). Prunes snapshots older than 48h. Returns true on success.
  */
-function ts_audit_snapshot(array $net): bool
+function lx_audit_snapshot(array $net): bool
 {
-    $db = ts_audit_pdo(true);
+    $db = lx_audit_pdo(true);
     if (!$db) {
         return false;
     }
     try {
-        $tip = ts_tip_height($net);
-        $proj = ts_audit_projected_txids($net);
+        $tip = lx_tip_height($net);
+        $proj = lx_audit_projected_txids($net);
         if (!$proj['txids']) {
             return false;   // empty mempool: nothing to predict
         }
@@ -154,14 +154,14 @@ function ts_audit_snapshot(array $net): bool
  * or before the block's timestamp) and stores the template-vs-mined diff.
  * Returns the number of blocks newly audited.
  */
-function ts_audit_run(array $net, int $maxBlocks = 12): int
+function lx_audit_run(array $net, int $maxBlocks = 12): int
 {
-    $db = ts_audit_pdo(true);
+    $db = lx_audit_pdo(true);
     if (!$db) {
         return 0;
     }
     try {
-        $tip = ts_tip_height($net);
+        $tip = lx_tip_height($net);
         if ($tip < 1) {
             return 0;
         }
@@ -182,14 +182,14 @@ function ts_audit_run(array $net, int $maxBlocks = 12): int
             . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $done = 0;
         for ($h = $from; $h <= $tip; $h++) {
-            $hash = ts_block_hash_at($net, $h);
+            $hash = lx_block_hash_at($net, $h);
             if ($hash === null) {
                 continue;
             }
             if (isset($have[$h]) && $have[$h] === $hash) {
                 continue;   // already audited and not reorged
             }
-            $hdr = ts_rpc_soft($net, 'getblockheader', [$hash, true]);
+            $hdr = lx_rpc_soft($net, 'getblockheader', [$hash, true]);
             $btime = is_array($hdr) ? (int) ($hdr['time'] ?? 0) : 0;
             $find->execute([$net['slug'], $h - 1, $btime > 0 ? $btime : time()]);
             $snap = $find->fetch(PDO::FETCH_ASSOC);
@@ -200,7 +200,7 @@ function ts_audit_run(array $net, int $maxBlocks = 12): int
             if (!is_array($predicted) || !$predicted) {
                 continue;
             }
-            $txids = ts_block_txids($net, $hash);
+            $txids = lx_block_txids($net, $hash);
             if (!$txids) {
                 continue;
             }
@@ -211,9 +211,9 @@ function ts_audit_run(array $net, int $maxBlocks = 12): int
             // "added" and a deflated match rate. Drop it by IDENTITY, not position:
             // a block with no HogEx must not lose a real trailing tx.
             if (($net['coin'] ?? '') === 'ltc' && $mined
-                && function_exists('ts_mweb_activation') && $h >= ts_mweb_activation($net)
-                && function_exists('ts_mweb_block')) {
-                $mw = ts_mweb_block($net, $hash);
+                && function_exists('lx_mweb_activation') && $h >= lx_mweb_activation($net)
+                && function_exists('lx_mweb_block')) {
+                $mw = lx_mweb_block($net, $hash);
                 if (is_array($mw) && !empty($mw['hogex_txid'])) {
                     $hx = $mw['hogex_txid'];
                     $mined = array_values(array_filter($mined, function ($t) use ($hx) { return $t !== $hx; }));
@@ -267,9 +267,9 @@ function ts_audit_run(array $net, int $maxBlocks = 12): int
  * ['height','hash','block_time','snap_ts','expected','mined','matched',
  *  'missing','added','missing_txids'=>[], 'added_txids'=>[], 'match_pct'=>float].
  */
-function ts_audit_get(array $net, int $height): ?array
+function lx_audit_get(array $net, int $height): ?array
 {
-    $db = ts_audit_pdo(false);
+    $db = lx_audit_pdo(false);
     if (!$db) {
         return null;
     }

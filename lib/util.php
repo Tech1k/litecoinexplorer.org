@@ -12,14 +12,14 @@ function h($s): string
 }
 
 /** Emit permissive CORS headers (drop-in clients call /api from the browser). */
-function ts_cors(): void
+function lx_cors(): void
 {
     static $sent = false;
     if ($sent) {
         return;
     }
     $sent = true;
-    $origin = ts_config()['cors_origin'] ?? '*';
+    $origin = lx_config()['cors_origin'] ?? '*';
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
@@ -35,7 +35,7 @@ function json_out($data, int $status = 200, int $cache = 0): void
 {
     if (!headers_sent()) {
         http_response_code($status);
-        ts_cors();
+        lx_cors();
         header('Content-Type: application/json; charset=utf-8');
         if ($cache > 0) {
             header('Cache-Control: public, max-age=' . $cache);
@@ -50,7 +50,7 @@ function text_out(string $body, int $status = 200, string $ctype = 'text/plain',
 {
     if (!headers_sent()) {
         http_response_code($status);
-        ts_cors();
+        lx_cors();
         // charset only applies to text/*; binary (/raw) is application/octet-stream.
         $charset = stripos($ctype, 'text/') === 0 ? '; charset=utf-8' : '';
         header('Content-Type: ' . $ctype . $charset);
@@ -141,7 +141,7 @@ function time_ago(int $ts): string
 }
 
 /** Compact duration: 45 -> "45s", 150 -> "2m", 3720 -> "1h 2m", 90000 -> "1d". */
-function ts_dur_short(int $s): string
+function lx_dur_short(int $s): string
 {
     $s = abs($s);
     if ($s < 60) {
@@ -180,7 +180,7 @@ function shorten(string $s, int $head = 10, int $tail = 8): string
  * $step must already be in the same scaled unit as the value being formatted.
  * Returns $base when $step is 0/unknown, giving byte-identical legacy output.
  */
-function ts_step_dec(float $step, int $base = 0): int
+function lx_step_dec(float $step, int $base = 0): int
 {
     if ($step > 0 && $step < 1) {
         $need = (int) ceil(-log10($step));
@@ -191,7 +191,7 @@ function ts_step_dec(float $step, int $base = 0): int
     return $base;
 }
 
-function ts_hashrate(float $hs, float $step = 0.0): string
+function lx_hashrate(float $hs, float $step = 0.0): string
 {
     if ($hs <= 0) {
         return '0 H/s';
@@ -203,8 +203,8 @@ function ts_hashrate(float $hs, float $step = 0.0): string
         $step /= 1000;
         $i++;
     }
-    // $step=0 -> ts_step_dec returns the base (0 above 100, else 2): unchanged.
-    return number_format($hs, ts_step_dec($step, $hs >= 100 ? 0 : 2)) . ' ' . $units[$i];
+    // $step=0 -> lx_step_dec returns the base (0 above 100, else 2): unchanged.
+    return number_format($hs, lx_step_dec($step, $hs >= 100 ? 0 : 2)) . ' ' . $units[$i];
 }
 
 /**
@@ -213,7 +213,7 @@ function ts_hashrate(float $hs, float $step = 0.0): string
  * Text is filled when the push is valid UTF-8 (or printable ASCII) with no
  * control bytes; the witness-commitment marker (aa21a9ed) is recognised.
  */
-function ts_parse_op_return(string $hex): array
+function lx_parse_op_return(string $hex): array
 {
     $bin = @hex2bin($hex);
     if ($bin === false || $bin === '' || ord($bin[0]) !== 0x6a) {

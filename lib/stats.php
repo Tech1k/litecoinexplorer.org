@@ -8,19 +8,19 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-function ts_stats_db_path(): ?string
+function lx_stats_db_path(): ?string
 {
-    $cache = ts_config()['cache_db'] ?? null;
+    $cache = lx_config()['cache_db'] ?? null;
     return $cache ? dirname($cache) . '/stats.sqlite' : null;
 }
 
-function ts_stats_pdo(bool $create = false): ?PDO
+function lx_stats_pdo(bool $create = false): ?PDO
 {
     static $pdo = null;            // memoize only a real handle; a null return re-attempts next
     if ($pdo instanceof PDO) {     // call, so the long-lived WS daemon self-heals once the cron
         return $pdo;               // creates stats.sqlite (was: permanently cached the null).
     }
-    $path = ts_stats_db_path();
+    $path = lx_stats_db_path();
     if (!$path) {
         return null;
     }
@@ -58,17 +58,17 @@ function ts_stats_pdo(bool $create = false): ?PDO
 }
 
 /** Append one snapshot for $net (called by the cron). Returns true on success. */
-function ts_stats_snapshot(array $net): bool
+function lx_stats_snapshot(array $net): bool
 {
-    $db = ts_stats_pdo(true);
+    $db = lx_stats_pdo(true);
     if (!$db) {
         return false;
     }
     $count = 0; $vsize = 0; $fee = 0; $fast = 0; $tip = 0;
     $tiers = [0, 0, 0, 0, 0, 0];   // vsize by fee band: <1,1-2,2-5,5-10,10-20,20+
     try {
-        $tip = ts_tip_height($net);
-        $mem = ts_esplora_mempool($net);
+        $tip = lx_tip_height($net);
+        $mem = lx_esplora_mempool($net);
         $count = (int) ($mem['count'] ?? 0);
         $vsize = (int) ($mem['vsize'] ?? 0);
         $fee   = (int) ($mem['total_fee'] ?? 0);
@@ -79,7 +79,7 @@ function ts_stats_snapshot(array $net): bool
             $tiers[$idx] += $bvs;
         }
         try {
-            $fees = ts_fees_recommended($net);
+            $fees = lx_fees_recommended($net);
             $fast = (int) ($fees['fastestFee'] ?? 0);
         } catch (Throwable $e) {
             // fee estimate optional
@@ -101,9 +101,9 @@ function ts_stats_snapshot(array $net): bool
 }
 
 /** Snapshots for $net over the last $hours, oldest-first (for the charts). */
-function ts_stats_series(array $net, int $hours = 48): array
+function lx_stats_series(array $net, int $hours = 48): array
 {
-    $db = ts_stats_pdo(false);
+    $db = lx_stats_pdo(false);
     if (!$db) {
         return [];
     }

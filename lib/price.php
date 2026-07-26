@@ -17,10 +17,10 @@
  */
 
 /** Price config merged with defaults. */
-function ts_price_config(): array
+function lx_price_config(): array
 {
     static $default = ['usd', 'eur', 'gbp', 'cad', 'chf', 'aud', 'jpy'];   // mempool.space's fiat set
-    $c = ts_config()['price'] ?? [];
+    $c = lx_config()['price'] ?? [];
     $cur = array_values(array_filter(array_map('strtolower', (array) ($c['currencies'] ?? $default))));
     return [
         'enabled'    => $c['enabled'] ?? true,
@@ -35,10 +35,10 @@ function ts_price_config(): array
 }
 
 /** True when price display is available for this network. */
-function ts_price_enabled(array $net): bool
+function lx_price_enabled(array $net): bool
 {
     return ($net['coin'] ?? '') === 'ltc'
-        && !empty(ts_price_config()['enabled'])
+        && !empty(lx_price_config()['enabled'])
         && function_exists('curl_init');
 }
 
@@ -47,12 +47,12 @@ function ts_price_enabled(array $net): bool
  *   ['ts'=>int, 'source'=>str, 'prices'=>['usd'=>float,...], 'change_24h'=>['usd'=>float,...]]
  * Cached ~ttl on success; short negative cache on failure so page loads don't stall.
  */
-function ts_price(array $net): ?array
+function lx_price(array $net): ?array
 {
-    if (!ts_price_enabled($net)) {
+    if (!lx_price_enabled($net)) {
         return null;
     }
-    $cfg = ts_price_config();
+    $cfg = lx_price_config();
     $ck  = 'price:' . $cfg['coin_id'] . ':' . implode(',', $cfg['currencies']);
     $downKey = 'price:down';
 
@@ -65,7 +65,7 @@ function ts_price(array $net): ?array
         return null;   // recent failure - skip the call, degrade to no-fiat
     }
 
-    $snap = ts_price_fetch($cfg);
+    $snap = lx_price_fetch($cfg);
     if ($snap === null) {
         cache_set($downKey, '1', 30);
         return null;
@@ -75,7 +75,7 @@ function ts_price(array $net): ?array
 }
 
 /** One HTTP fetch from the configured source (CoinGecko simple/price shape). */
-function ts_price_fetch(array $cfg): ?array
+function lx_price_fetch(array $cfg): ?array
 {
     if ($cfg['source'] !== 'coingecko') {
         return null;   // only the CoinGecko shape is implemented
@@ -130,14 +130,14 @@ function ts_price_fetch(array $cfg): ?array
  * price chart works immediately without waiting for the local snapshot cron to
  * accumulate points. Returns [['t'=>unix, 'p'=>float], ...] oldest-first, or []
  * on failure. Cached 6h on success, 10min on failure (bounded retry). Server-side
- * only (same strict-CSP reasoning as ts_price_fetch); response treated as untrusted.
+ * only (same strict-CSP reasoning as lx_price_fetch); response treated as untrusted.
  */
-function ts_price_market_chart(array $net, string $cur, int $days = 365): array
+function lx_price_market_chart(array $net, string $cur, int $days = 365): array
 {
-    if (!ts_price_enabled($net)) {
+    if (!lx_price_enabled($net)) {
         return [];
     }
-    $cfg = ts_price_config();
+    $cfg = lx_price_config();
     if ($cfg['source'] !== 'coingecko') {
         return [];
     }
@@ -183,13 +183,13 @@ function ts_price_market_chart(array $net, string $cur, int $days = 365): array
 }
 
 /** Display-currency price float, or null. */
-function ts_price_now(array $net): ?float
+function lx_price_now(array $net): ?float
 {
-    $p = ts_price($net);
+    $p = lx_price($net);
     if (!$p || empty($p['prices'])) {
         return null;
     }
-    $vs = ts_price_config()['display'];
+    $vs = lx_price_config()['display'];
     if (isset($p['prices'][$vs])) {
         return (float) $p['prices'][$vs];
     }
@@ -198,18 +198,18 @@ function ts_price_now(array $net): ?float
 }
 
 /** 24h % change in the display currency, or null. */
-function ts_price_change(array $net): ?float
+function lx_price_change(array $net): ?float
 {
-    $p = ts_price($net);
+    $p = lx_price($net);
     if (!$p) {
         return null;
     }
-    $vs = ts_price_config()['display'];
+    $vs = lx_price_config()['display'];
     return isset($p['change_24h'][$vs]) ? (float) $p['change_24h'][$vs] : null;
 }
 
 /** Currency symbol for a lower-case code (falls back to the upper-case code). */
-function ts_price_symbol(string $cur): string
+function lx_price_symbol(string $cur): string
 {
     static $m = ['usd' => '$', 'eur' => "\xE2\x82\xAC", 'gbp' => "\xC2\xA3", 'jpy' => "\xC2\xA5",
                  'cad' => 'CA$', 'aud' => 'A$', 'chf' => 'CHF ', 'btc' => "\xE2\x82\xBF"];
@@ -220,14 +220,14 @@ function ts_price_symbol(string $cur): string
  * Fiat string for integer satoshis at $price (display currency), or null when no
  * price. Scales decimals so small amounts stay legible.
  */
-function ts_fiat_str(int $sat, ?float $price, ?string $cur = null): ?string
+function lx_fiat_str(int $sat, ?float $price, ?string $cur = null): ?string
 {
     if ($price === null || $price <= 0) {
         return null;
     }
-    $cur = $cur ?? ts_price_config()['display'];
+    $cur = $cur ?? lx_price_config()['display'];
     $v   = $sat / 100000000 * $price;
-    $sym = ts_price_symbol($cur);
+    $sym = lx_price_symbol($cur);
     $abs = abs($v);
     if ($abs == 0.0)      { $s = '0.00'; }
     elseif ($abs >= 1)    { $s = number_format($v, 2); }
@@ -241,9 +241,9 @@ function ts_fiat_str(int $sat, ?float $price, ?string $cur = null): ?string
  * re-denominate it live. Empty string when price is unavailable. The "≈ " prefix is the
  * caller's; this returns just the value span.
  */
-function ts_fiat_el(int $sat, ?float $price): string
+function lx_fiat_el(int $sat, ?float $price): string
 {
-    $s = ts_fiat_str($sat, $price);
+    $s = lx_fiat_str($sat, $price);
     if ($s === null) {
         return '';
     }
@@ -251,13 +251,13 @@ function ts_fiat_el(int $sat, ?float $price): string
 }
 
 /** Display-currency price nearest a unix timestamp (from the hourly history), or null. */
-function ts_price_at(array $net, int $ts, ?string $cur = null): ?float
+function lx_price_at(array $net, int $ts, ?string $cur = null): ?float
 {
-    if (!function_exists('ts_price_history')) {
+    if (!function_exists('lx_price_history')) {
         return null;
     }
-    $cur = strtolower($cur ?? ts_price_config()['display']);
-    $h = ts_price_history($net, $cur, $ts);
+    $cur = strtolower($cur ?? lx_price_config()['display']);
+    $h = lx_price_history($net, $cur, $ts);
     $pts = $h['prices'] ?? [];
     if (!$pts) {
         return null;
@@ -274,19 +274,19 @@ function ts_price_at(array $net, int $ts, ?string $cur = null): ?float
 }
 
 /** Formatted display-currency spot price, or null (e.g. "$65.42"). */
-function ts_price_str(array $net): ?string
+function lx_price_str(array $net): ?string
 {
-    $p = ts_price_now($net);
+    $p = lx_price_now($net);
     if ($p === null) {
         return null;
     }
-    return ts_price_symbol(ts_price_config()['display']) . number_format($p, $p < 1 ? 4 : 2);
+    return lx_price_symbol(lx_price_config()['display']) . number_format($p, $p < 1 ? 4 : 2);
 }
 
 /** mempool.space-compatible /api/v1/prices payload: {"time":unix,"USD":..,...}. */
-function ts_prices_api(array $net): array
+function lx_prices_api(array $net): array
 {
-    $p = ts_price($net);
+    $p = lx_price($net);
     $out = ['time' => $p['ts'] ?? time()];
     foreach (($p['prices'] ?? []) as $c => $v) {
         $out[strtoupper($c)] = $v;
@@ -295,15 +295,15 @@ function ts_prices_api(array $net): array
 }
 
 // ---- historical price (/api/v1/historical-price) --------------------------
-// Populated by the snapshot cron (ts_price_record), one row per hour, kept long.
+// Populated by the snapshot cron (lx_price_record), one row per hour, kept long.
 
-function ts_price_db(bool $create = false): ?PDO
+function lx_price_db(bool $create = false): ?PDO
 {
     static $pdo = false;
     if ($pdo !== false) {
         return $pdo;
     }
-    $cache = ts_config()['cache_db'] ?? null;
+    $cache = lx_config()['cache_db'] ?? null;
     $path = $cache ? dirname($cache) . '/price.sqlite' : null;
     if (!$path || (!$create && !is_file($path))) {
         return $pdo = null;
@@ -326,16 +326,16 @@ function ts_price_db(bool $create = false): ?PDO
 }
 
 /** Record the current price into the hourly history (called by the snapshot cron). */
-function ts_price_record(array $net): bool
+function lx_price_record(array $net): bool
 {
-    if (!ts_price_enabled($net)) {
+    if (!lx_price_enabled($net)) {
         return false;
     }
-    $snap = ts_price($net);
+    $snap = lx_price($net);
     if (!$snap || empty($snap['prices'])) {
         return false;
     }
-    $db = ts_price_db(true);
+    $db = lx_price_db(true);
     if (!$db) {
         return false;
     }
@@ -356,11 +356,11 @@ function ts_price_record(array $net): bool
  * currencies (mempool behaviour) but is filtered to time+that currency.
  */
 /** GET /api/v1/historical-price - reads ?currency / ?timestamp then delegates. */
-function ts_historical_price_api(array $net): array
+function lx_historical_price_api(array $net): array
 {
     $cur = isset($_GET['currency']) && is_string($_GET['currency']) ? strtolower($_GET['currency']) : null;
     $ts  = isset($_GET['timestamp']) && ctype_digit((string) $_GET['timestamp']) ? (int) $_GET['timestamp'] : null;
-    return ts_price_history($net, $cur, $ts);
+    return lx_price_history($net, $cur, $ts);
 }
 
 /**
@@ -368,10 +368,10 @@ function ts_historical_price_api(array $net): array
  * (else every point carries all currencies); $ts returns the single closest point.
  * Query-param-free so views (e.g. /charts) can call it without $_GET leaking in.
  */
-function ts_price_history(array $net, ?string $cur = null, ?int $ts = null): array
+function lx_price_history(array $net, ?string $cur = null, ?int $ts = null): array
 {
     $out = ['prices' => [], 'exchangeRates' => new stdClass()];
-    $db = ts_price_db(false);
+    $db = lx_price_db(false);
     if (!$db) {
         return $out;
     }

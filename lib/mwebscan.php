@@ -15,7 +15,7 @@
  */
 
 /** MWEBscan network for a net ('testnet'|'mainnet'), or null (not LTC). */
-function ts_mwebscan_network(array $net): ?string
+function lx_mwebscan_network(array $net): ?string
 {
     if (($net['coin'] ?? '') !== 'ltc') {
         return null;
@@ -25,11 +25,11 @@ function ts_mwebscan_network(array $net): ?string
 }
 
 /** Config/constant-only API base for this network, or null (dormant). */
-function ts_mwebscan_api_base(array $net): ?string
+function lx_mwebscan_api_base(array $net): ?string
 {
     $base = $net['mwebscan_api'] ?? null;
     if (!is_string($base) || $base === '') {
-        $cfg = ts_config()['mwebscan_api'] ?? null;
+        $cfg = lx_config()['mwebscan_api'] ?? null;
         if (is_array($cfg)) {
             $base = $cfg[$net['slug']] ?? null;
         } elseif (is_string($cfg)) {
@@ -40,10 +40,10 @@ function ts_mwebscan_api_base(array $net): ?string
 }
 
 /** True when the MWEBscan overlay can be fetched for this network. */
-function ts_mwebscan_enabled(array $net): bool
+function lx_mwebscan_enabled(array $net): bool
 {
-    return ts_mwebscan_network($net) !== null
-        && ts_mwebscan_api_base($net) !== null
+    return lx_mwebscan_network($net) !== null
+        && lx_mwebscan_api_base($net) !== null
         && function_exists('curl_init');
 }
 
@@ -53,13 +53,13 @@ function ts_mwebscan_enabled(array $net): bool
  * transport / timeout / non-JSON / network mismatch). A short negative cache backs
  * off when the service is unreachable so page loads don't stall on every request.
  */
-function ts_mwebscan_api(array $net, string $endpoint, array $params = [], int $ttl = 60): ?array
+function lx_mwebscan_api(array $net, string $endpoint, array $params = [], int $ttl = 60): ?array
 {
-    if (!ts_mwebscan_enabled($net)) {
+    if (!lx_mwebscan_enabled($net)) {
         return null;
     }
-    $base = ts_mwebscan_api_base($net);
-    $want = ts_mwebscan_network($net);
+    $base = lx_mwebscan_api_base($net);
+    $want = lx_mwebscan_network($net);
 
     $ep = trim($endpoint, '/');
     if (!preg_match('/^[a-z][a-z_]*$/', $ep)) {   // fixed endpoint names only - no path injection
@@ -106,7 +106,7 @@ function ts_mwebscan_api(array $net, string $endpoint, array $params = [], int $
         return null;   // recent failure/slow response - skip the call, degrade to boundary-only
     }
 
-    $cfg     = ts_config();
+    $cfg     = lx_config();
     $headers = ['Accept: application/json'];
     $apiKey  = $cfg['mwebscan_api_key'] ?? null;
     if (is_array($apiKey)) {
@@ -154,7 +154,7 @@ function ts_mwebscan_api(array $net, string $endpoint, array $params = [], int $
 }
 
 /** Normalize a "reasons" field (a string[] in /links, a JSON-string in /trace) to string[]. */
-function ts_mwebscan_reasons($x): array
+function lx_mwebscan_reasons($x): array
 {
     if (is_array($x)) {
         return array_values(array_filter($x, 'is_string'));
@@ -170,7 +170,7 @@ function ts_mwebscan_reasons($x): array
 }
 
 /** "block N · updated N ago" freshness line from any response envelope, or ''. */
-function ts_mwebscan_freshness(?array $resp): string
+function lx_mwebscan_freshness(?array $resp): string
 {
     if (!is_array($resp)) {
         return '';
@@ -184,9 +184,9 @@ function ts_mwebscan_freshness(?array $resp): string
 }
 
 /** Human MWEBscan site URL (API base minus /api), for links + required attribution. */
-function ts_mwebscan_site(array $net): string
+function lx_mwebscan_site(array $net): string
 {
-    $base = ts_mwebscan_api_base($net);
+    $base = lx_mwebscan_api_base($net);
     if ($base === null) {
         return 'https://mwebscan.com';
     }

@@ -5,7 +5,7 @@
  */
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: public, s-maxage=60, max-age=0');   // static docs; edge-cacheable
-$base = ts_base_url();
+$base = lx_base_url();
 
 $groups = [
     'Blocks' => [
@@ -99,7 +99,7 @@ $groupIcons = [
     'MWEB' => 'shield',
 ];
 ?>
-<?php ts_head($net, [
+<?php lx_head($net, [
     'title' => 'API - Litecoin Explorer',
     'desc'  => 'Litecoin Explorer exposes a drop-in Esplora / mempool.space compatible REST API for Litecoin.',
 ]); ?>
@@ -119,7 +119,7 @@ $groupIcons = [
 
 <?php foreach ($groups as $title => $rows): ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon($groupIcons[$title] ?? 'box') ?><?= h($title) ?></span></div>
+  <div class="card-h"><span><?= lx_icon($groupIcons[$title] ?? 'box') ?><?= h($title) ?></span></div>
   <div class="card-b nopad">
     <div class="table-wrap">
     <table>
@@ -157,4 +157,4 @@ $groupIcons = [
   <span class="mono">{"track-mempool-txids":true}</span> (added/removed txid deltas) and
   <span class="mono">{"track-rbf":"all"}</span>.</p>
 </div></div>
-<?php ts_foot($net); ?>
+<?php lx_foot($net); ?>

@@ -13,7 +13,7 @@
   }
   function set(t) {
     root.setAttribute('data-theme', t);
-    try { localStorage.setItem('ts-theme', t); } catch (e) {}
+    try { localStorage.setItem('lx-theme', t); } catch (e) {}
     paint();
   }
   if (btn) {
@@ -129,7 +129,7 @@
     var sel = document.getElementById('ccy-sel');
     var SYM = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', CAD: 'CA$', AUD: 'A$', CHF: 'CHF ', BTC: '₿' };
     function sym(c) { return SYM[c] || (c + ' '); }
-    function fmtFiat(v, s) {                        // mirrors PHP ts_fiat_str decimal scaling
+    function fmtFiat(v, s) {                        // mirrors PHP lx_fiat_str decimal scaling
       var a = Math.abs(v), out;
       if (a === 0) { out = '0.00'; }
       else if (a >= 1) { out = v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -137,7 +137,7 @@
       else { out = v.toFixed(8).replace(/0+$/, '').replace(/\.$/, ''); }
       return s + out;
     }
-    function fmtCompact(v, s) {                     // mirrors PHP ts_num_compact (B/M/k)
+    function fmtCompact(v, s) {                     // mirrors PHP lx_num_compact (B/M/k)
       var a = Math.abs(v), div = 1, sfx = '', dec = 2;
       if (a >= 1e9) { div = 1e9; sfx = 'B'; dec = 2; }
       else if (a >= 1e6) { div = 1e6; sfx = 'M'; dec = 2; }
@@ -146,7 +146,7 @@
     }
     var def = (sel && sel.dataset.default) || 'USD';
     var stored = null;
-    try { stored = localStorage.getItem('ts-ccy'); } catch (e) {}
+    try { stored = localStorage.getItem('lx-ccy'); } catch (e) {}
     function valid(c) {                            // scan options directly - a tampered
       if (!sel) { return false; }                  // localStorage value must never throw
       for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === c) { return true; } }
@@ -182,7 +182,7 @@
     if (sel) {
       sel.addEventListener('change', function () {
         cur = sel.value;
-        try { localStorage.setItem('ts-ccy', cur); } catch (e) {}
+        try { localStorage.setItem('lx-ccy', cur); } catch (e) {}
         refresh();
       });
     }
@@ -276,7 +276,7 @@
     });
   });
 
-  // Interactive charts. Framed charts (.ts-chart) get the full controller:
+  // Interactive charts. Framed charts (.lx-chart) get the full controller:
   // nearest-point crosshair (V + H), an HTML data dot, a rich multi-row tooltip,
   // keyboard access + an aria-live readout. Un-framed charts keep a simple
   // <title> follow-tooltip. All vanilla DOM on our own inline SVG - CSP-safe.
@@ -326,16 +326,16 @@
   }
   function initFramedChart(fig) {
     var svg = fig.querySelector('svg'); if (!svg) { return; }
-    var bands = [].slice.call(svg.querySelectorAll('.ts-hov')); if (!bands.length) { return; }
+    var bands = [].slice.call(svg.querySelectorAll('.lx-hov')); if (!bands.length) { return; }
     var vb = (svg.getAttribute('viewBox') || '0 0 100 40').split(/\s+/);
     var vbW = parseFloat(vb[2]) || 100, vbH = parseFloat(vb[3]) || 40;
-    var dot = fig.querySelector('.ts-dot');
-    var live = fig.querySelector('.ts-live');
+    var dot = fig.querySelector('.lx-dot');
+    var live = fig.querySelector('.lx-live');
     var cur = -1;
     function clear() {
       cur = -1; tipHide();
       if (dot) { dot.hidden = true; }
-      var v = svg.querySelector('.ts-crosshair'), hz = svg.querySelector('.ts-crosshair-h');
+      var v = svg.querySelector('.lx-crosshair'), hz = svg.querySelector('.lx-crosshair-h');
       if (v) { v.style.display = 'none'; } if (hz) { hz.style.display = 'none'; }
     }
     function activate(i, evt) {
@@ -345,10 +345,10 @@
       var fx = parseFloat(b.getAttribute('data-fx'));
       var fyA = b.getAttribute('data-fy');
       var fy = fyA === null ? NaN : parseFloat(fyA);
-      var v = svgLine(svg, 'ts-crosshair', false, vbW, vbH);
+      var v = svgLine(svg, 'lx-crosshair', false, vbW, vbH);
       v.setAttribute('x1', fx * vbW); v.setAttribute('x2', fx * vbW); v.style.display = 'block';
       if (fy === fy) {                             // not NaN
-        var hz = svgLine(svg, 'ts-crosshair-h', true, vbW, vbH);
+        var hz = svgLine(svg, 'lx-crosshair-h', true, vbW, vbH);
         hz.setAttribute('y1', fy * vbH); hz.setAttribute('y2', fy * vbH); hz.style.display = 'block';
         if (dot) { dot.style.left = (fx * 100) + '%'; dot.style.top = (fy * 100) + '%'; dot.hidden = false; }
       }
@@ -384,12 +384,12 @@
     });
     svg.addEventListener('blur', clear);
   }
-  document.querySelectorAll('.ts-chart').forEach(initFramedChart);
+  document.querySelectorAll('.lx-chart').forEach(initFramedChart);
 
   // Legacy simple <title> follow-tooltip for un-framed charts (goggles, bars,
-  // diverging) not wrapped in a .ts-chart figure.
-  document.querySelectorAll('.ts-bars, .ts-area, .ts-diverge, .goggles').forEach(function (svg) {
-    if (svg.closest('.ts-chart')) { return; }
+  // diverging) not wrapped in a .lx-chart figure.
+  document.querySelectorAll('.lx-bars, .lx-area, .lx-diverge, .goggles').forEach(function (svg) {
+    if (svg.closest('.lx-chart')) { return; }
     svg.addEventListener('mousemove', function (e) {
       var el = e.target, title = null;
       if (el && el.tagName === 'rect') { var tt = el.getElementsByTagName('title')[0]; if (tt) { title = tt.textContent; } }
@@ -400,7 +400,7 @@
 
   // Value-flow ribbons + treemap cells: styled follow-tooltip (address/txid + amount/size)
   // driven by data-a / data-v, so there's no clashing native <title> tooltip.
-  document.querySelectorAll('.ts-flow, .ts-treemap').forEach(function (svg) {
+  document.querySelectorAll('.lx-flow, .lx-treemap').forEach(function (svg) {
     svg.addEventListener('mousemove', function (e) {
       var el = e.target;
       while (el && el !== svg && !(el.getAttribute && el.getAttribute('data-a') !== null)) { el = el.parentNode; }

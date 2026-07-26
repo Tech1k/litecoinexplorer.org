@@ -162,7 +162,7 @@ class TsElectrum
 }
 
 /** One lazily-connected Electrum client per network slug. */
-function ts_electrum(array $net): TsElectrum
+function lx_electrum(array $net): TsElectrum
 {
     static $clients = [];
     $slug = $net['slug'];
@@ -179,9 +179,9 @@ function ts_electrum(array $net): TsElectrum
  * Electrum scripthash for an address: reverse(sha256(scriptPubKey)) as hex.
  * Returns null if the address can't be decoded for this network.
  */
-function ts_scripthash(array $net, string $address): ?string
+function lx_scripthash(array $net, string $address): ?string
 {
-    $spk = ts_address_to_scriptpubkey($net, $address);
+    $spk = lx_address_to_scriptpubkey($net, $address);
     if ($spk === null) {
         return null;
     }

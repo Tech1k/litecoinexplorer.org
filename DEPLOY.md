@@ -451,7 +451,7 @@ won't storm a struggling backend. Lower `blockindex_per_run` if the node is busy
   Consider a modest CDN limit on `POST /api/tx` (broadcast) too - it relays 1:1 to litecoind (no
   amplification, and the node dedups/enforces mempool policy), but a public unauthenticated relay
   endpoint benefits from a spam ceiling.
-  A built-in origin-side per-IP limiter (`ts_rate_limit`, backed by the cache DB) also throttles
+  A built-in origin-side per-IP limiter (`lx_rate_limit`, backed by the cache DB) also throttles
   `/xpub/*` (20/min) and `/og/*` (60/min) as defense-in-depth. It keys on `CF-Connecting-IP`, so
   **the origin must only accept Cloudflare traffic** (firewall the origin to Cloudflare's IP
   ranges) - otherwise a client hitting the origin directly can spoof that header to dodge the

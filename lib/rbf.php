@@ -5,7 +5,7 @@
  * replacements by watching the mempool over time: when a NEW tx spends an input outpoint
  * that a now-departed mempool tx also spent, the new tx replaced the old one (BIP125 opt-in
  * or full-RBF). Best-effort and bounded; shared by the snapshot cron and the WS daemon
- * (both call ts_rbf_tick). The first-input outpoint is used as the conflict key - one shared
+ * (both call lx_rbf_tick). The first-input outpoint is used as the conflict key - one shared
  * input is enough to conflict, and typical fee-bumps reuse their inputs.
  *
  * Store: db/rbf.sqlite (next to the cache).
@@ -15,19 +15,19 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-function ts_rbf_db_path(): ?string
+function lx_rbf_db_path(): ?string
 {
-    $cache = ts_config()['cache_db'] ?? null;
+    $cache = lx_config()['cache_db'] ?? null;
     return $cache ? dirname($cache) . '/rbf.sqlite' : null;
 }
 
-function ts_rbf_db(bool $create = false): ?PDO
+function lx_rbf_db(bool $create = false): ?PDO
 {
     static $pdo = false;
     if ($pdo !== false) {
         return $pdo;
     }
-    $path = ts_rbf_db_path();
+    $path = lx_rbf_db_path();
     if (!$path || (!$create && !is_file($path))) {
         return $pdo = null;
     }
@@ -60,7 +60,7 @@ function ts_rbf_db(bool $create = false): ?PDO
 }
 
 /** Reduce an Esplora tx to the fields we track. Returns null for coinbase / malformed. */
-function ts_rbf_txinfo(array $tx): ?array
+function lx_rbf_txinfo(array $tx): ?array
 {
     $vin = $tx['vin'] ?? [];
     if (!$vin || !empty($vin[0]['is_coinbase'])) {
@@ -93,14 +93,14 @@ function ts_rbf_txinfo(array $tx): ?array
  * recording any replacements. $maxNew bounds per-tick tx fetches so a spam burst can't
  * pin the origin. Returns the number of replacements newly recorded.
  */
-function ts_rbf_tick(array $net, int $maxNew = 150): int
+function lx_rbf_tick(array $net, int $maxNew = 150): int
 {
-    $db = ts_rbf_db(true);
+    $db = lx_rbf_db(true);
     if (!$db) {
         return 0;
     }
     try {
-        $current = ts_mempool_txids($net);
+        $current = lx_mempool_txids($net);
         if (!is_array($current)) {
             return 0;
         }
@@ -123,9 +123,9 @@ function ts_rbf_tick(array $net, int $maxNew = 150): int
             . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $recorded = 0;
         foreach ($new as $tid) {
-            $tx = ts_find_tx($net, $tid);
+            $tx = lx_find_tx($net, $tid);
             if (!is_array($tx)) { continue; }
-            $info = ts_rbf_txinfo($tx);
+            $info = lx_rbf_txinfo($tx);
             if ($info === null) { continue; }
             $selOp->execute([$net['slug'], $info['op']]);
             $prev = $selOp->fetch(PDO::FETCH_ASSOC);
@@ -158,7 +158,7 @@ function ts_rbf_tick(array $net, int $maxNew = 150): int
 }
 
 /** Build the mempool.space tx object for one side of an event row. */
-function ts_rbf_txobj(string $txid, int $fee, int $vsize, int $value, bool $rbf, bool $fullRbf, int $time): array
+function lx_rbf_txobj(string $txid, int $fee, int $vsize, int $value, bool $rbf, bool $fullRbf, int $time): array
 {
     return [
         'txid'    => $txid,
@@ -176,24 +176,24 @@ function ts_rbf_txobj(string $txid, int $fee, int $vsize, int $value, bool $rbf,
  * Recursively build a replacement tree node rooted at $txid (mempool.space shape):
  * { tx, time, fullRbf, replaces:[ ...child nodes each with an extra "interval" ] }.
  */
-function ts_rbf_node(PDO $db, array $net, string $txid, array $row, int $depth = 0): array
+function lx_rbf_node(PDO $db, array $net, string $txid, array $row, int $depth = 0): array
 {
     $node = [
-        'tx'       => ts_rbf_txobj($txid, (int) $row['r_fee'], (int) $row['r_vsize'], (int) $row['r_value'], ((int) $row['r_rbf']) === 1, ((int) $row['full_rbf']) === 1, (int) $row['r_time']),
+        'tx'       => lx_rbf_txobj($txid, (int) $row['r_fee'], (int) $row['r_vsize'], (int) $row['r_value'], ((int) $row['r_rbf']) === 1, ((int) $row['full_rbf']) === 1, (int) $row['r_time']),
         'time'     => (int) $row['ts'],
         'fullRbf'  => ((int) $row['full_rbf']) === 1,
         'replaces' => [],
     ];
     // The replaced tx becomes a child; if IT was itself a replacement, recurse.
     $childTxid = (string) $row['replaced_txid'];
-    $childTx = ts_rbf_txobj($childTxid, (int) $row['o_fee'], (int) $row['o_vsize'], (int) $row['o_value'], ((int) $row['o_rbf']) === 1, false, (int) $row['o_time']);
+    $childTx = lx_rbf_txobj($childTxid, (int) $row['o_fee'], (int) $row['o_vsize'], (int) $row['o_value'], ((int) $row['o_rbf']) === 1, false, (int) $row['o_time']);
     $child = ['tx' => $childTx, 'time' => (int) $row['o_time'], 'interval' => max(0, (int) $row['ts'] - (int) $row['o_time']), 'fullRbf' => false, 'replaces' => []];
     if ($depth < 8) {
         $st = $db->prepare('SELECT * FROM rbf_event WHERE net = ? AND replacement_txid = ? LIMIT 1');
         $st->execute([$net['slug'], $childTxid]);
         $sub = $st->fetch(PDO::FETCH_ASSOC);
         if ($sub) {
-            $subNode = ts_rbf_node($db, $net, $childTxid, $sub, $depth + 1);
+            $subNode = lx_rbf_node($db, $net, $childTxid, $sub, $depth + 1);
             $subNode['interval'] = max(0, (int) $row['ts'] - (int) $subNode['time']);
             $child = $subNode;
         }
@@ -203,9 +203,9 @@ function ts_rbf_node(PDO $db, array $net, string $txid, array $row, int $depth =
 }
 
 /** GET /api/v1/tx/:txid/rbf - {replacements: <tree>, replaces: [txid,...]}. */
-function ts_rbf_tx_api(array $net, string $txid): array
+function lx_rbf_tx_api(array $net, string $txid): array
 {
-    $db = ts_rbf_db(false);
+    $db = lx_rbf_db(false);
     $empty = ['replacements' => [], 'replaces' => []];
     if (!$db) {
         return $empty;
@@ -230,16 +230,16 @@ function ts_rbf_tx_api(array $net, string $txid): array
         $rp = $db->prepare('SELECT replaced_txid FROM rbf_event WHERE net = ? AND replacement_txid = ?');
         $rp->execute([$net['slug'], $txid]);
         $replaces = array_map('strval', array_column($rp->fetchAll(PDO::FETCH_ASSOC), 'replaced_txid'));
-        return ['replacements' => ts_rbf_node($db, $net, $root, $row), 'replaces' => $replaces];
+        return ['replacements' => lx_rbf_node($db, $net, $root, $row), 'replaces' => $replaces];
     } catch (Throwable $e) {
         return $empty;
     }
 }
 
 /** GET /api/v1/replacements - array of recent RBF chains (newest-first tree nodes). */
-function ts_replacements_api(array $net, int $limit = 100): array
+function lx_replacements_api(array $net, int $limit = 100): array
 {
-    $db = ts_rbf_db(false);
+    $db = lx_rbf_db(false);
     if (!$db) {
         return [];
     }
@@ -252,7 +252,7 @@ function ts_replacements_api(array $net, int $limit = 100): array
         $st->execute([$net['slug'], $limit]);
         $out = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $out[] = ts_rbf_node($db, $net, (string) $row['replacement_txid'], $row);
+            $out[] = lx_rbf_node($db, $net, (string) $row['replacement_txid'], $row);
         }
         return $out;
     } catch (Throwable $e) {

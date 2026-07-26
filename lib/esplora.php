@@ -15,21 +15,21 @@
 
 // ---- chain tip ------------------------------------------------------------
 
-function ts_tip_height(array $net): int
+function lx_tip_height(array $net): int
 {
     return cache_remember('tiph:' . $net['slug'], 5, function () use ($net) {
-        return (int) ts_rpc($net, 'getblockcount');
+        return (int) lx_rpc($net, 'getblockcount');
     });
 }
 
-function ts_tip_hash(array $net): string
+function lx_tip_hash(array $net): string
 {
     return cache_remember('tiphash:' . $net['slug'], 5, function () use ($net) {
-        return (string) ts_rpc($net, 'getbestblockhash');
+        return (string) lx_rpc($net, 'getbestblockhash');
     });
 }
 
-function ts_block_hash_at(array $net, int $height): ?string
+function lx_block_hash_at(array $net, int $height): ?string
 {
     if ($height < 0) {
         return null;
@@ -40,23 +40,23 @@ function ts_block_hash_at(array $net, int $height): ?string
     if ($hit !== null) {
         return $hit;
     }
-    $hash = ts_rpc_soft($net, 'getblockhash', [$height]);
+    $hash = lx_rpc_soft($net, 'getblockhash', [$height]);
     if (!is_string($hash)) {
         return null;
     }
     // Near-tip heights can reorg, so cache briefly; deeper heights are stable.
-    $ttl = ($height > ts_tip_height($net) - 10) ? 3 : 30;
+    $ttl = ($height > lx_tip_height($net) - 10) ? 3 : 30;
     cache_set($key, $hash, $ttl);
     return $hash;
 }
 
 /**
  * Batch height->hash resolution. Reuses the same per-height cache (keys + TTL) as
- * ts_block_hash_at, then fetches all misses in ONE getblockhash round-trip. This
+ * lx_block_hash_at, then fetches all misses in ONE getblockhash round-trip. This
  * collapses the home page's ~10-12 serial getblockhash calls (3s near-tip TTL)
  * into a single request. Returns [height => hash]; unresolved heights are omitted.
  */
-function ts_block_hashes(array $net, array $heights): array
+function lx_block_hashes(array $net, array $heights): array
 {
     $out = [];
     $miss = [];
@@ -66,10 +66,10 @@ function ts_block_hashes(array $net, array $heights): array
         if ($hit !== null) { $out[$h] = $hit; } else { $miss[] = $h; }
     }
     if ($miss) {
-        $tip = ts_tip_height($net);
+        $tip = lx_tip_height($net);
         $calls = [];
         foreach ($miss as $h) { $calls[] = ['getblockhash', [$h]]; }
-        $res = ts_rpc_batch($net, $calls);
+        $res = lx_rpc_batch($net, $calls);
         foreach ($miss as $i => $h) {
             $hash = $res[$i] ?? null;
             if (is_string($hash)) {
@@ -81,14 +81,14 @@ function ts_block_hashes(array $net, array $heights): array
     return $out;
 }
 
-function ts_block_height_for_hash(array $net, string $hash): ?int
+function lx_block_height_for_hash(array $net, string $hash): ?int
 {
     $key = 'bh:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($key);
     if ($hit !== null) {
         return (int) $hit;
     }
-    $hdr = ts_rpc_soft($net, 'getblockheader', [$hash, true]);
+    $hdr = lx_rpc_soft($net, 'getblockheader', [$hash, true]);
     if (!is_array($hdr) || !isset($hdr['height'])) {
         return null;
     }
@@ -96,14 +96,14 @@ function ts_block_height_for_hash(array $net, string $hash): ?int
     return (int) $hdr['height'];
 }
 
-function ts_block_time_at(array $net, string $hash): ?int
+function lx_block_time_at(array $net, string $hash): ?int
 {
     $key = 'btime:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($key);
     if ($hit !== null) {
         return (int) $hit;
     }
-    $hdr = ts_rpc_soft($net, 'getblockheader', [$hash, true]);
+    $hdr = lx_rpc_soft($net, 'getblockheader', [$hash, true]);
     if (!is_array($hdr) || !isset($hdr['time'])) {
         return null;
     }
@@ -112,16 +112,16 @@ function ts_block_time_at(array $net, string $hash): ?int
 }
 
 /** Map an electrs listunspent row to an Esplora utxo (with confirmed block info). */
-function ts_map_utxo_row(array $net, array $u): array
+function lx_map_utxo_row(array $net, array $u): array
 {
     $height = (int) ($u['height'] ?? 0);
     $status = ['confirmed' => $height > 0];
     if ($height > 0) {
         $status['block_height'] = $height;
-        $bh = ts_block_hash_at($net, $height);
+        $bh = lx_block_hash_at($net, $height);
         if ($bh !== null) {
             $status['block_hash'] = $bh;
-            $bt = ts_block_time_at($net, $bh);
+            $bt = lx_block_time_at($net, $bh);
             if ($bt !== null) {
                 $status['block_time'] = $bt;
             }
@@ -138,7 +138,7 @@ function ts_map_utxo_row(array $net, array $u): array
 // ---- scriptPubKey type mapping --------------------------------------------
 
 /** Map Core scriptPubKey.type to the Esplora vocabulary. */
-function ts_map_spk_type(string $coreType): string
+function lx_map_spk_type(string $coreType): string
 {
     static $m = [
         'pubkeyhash'            => 'p2pkh',
@@ -162,13 +162,13 @@ function ts_map_spk_type(string $coreType): string
 }
 
 /** Map a Core scriptPubKey (+value) into an Esplora vin.prevout / vout entry. */
-function ts_map_spk(array $spk, $value): array
+function lx_map_spk(array $spk, $value): array
 {
     $addr = $spk['address'] ?? ($spk['addresses'][0] ?? null);
     $out = [
         'scriptpubkey'      => $spk['hex'] ?? '',
         'scriptpubkey_asm'  => $spk['asm'] ?? '',
-        'scriptpubkey_type' => ts_map_spk_type($spk['type'] ?? 'nonstandard'),
+        'scriptpubkey_type' => lx_map_spk_type($spk['type'] ?? 'nonstandard'),
     ];
     // Esplora omits scriptpubkey_address entirely when the script has no
     // decodable address (op_return, bare multisig, p2pk, ...). Never null.
@@ -182,27 +182,27 @@ function ts_map_spk(array $spk, $value): array
 // ---- transaction ----------------------------------------------------------
 
 /** Fetch Core's verbose decoded tx, with a blockhash hint for no-txindex nodes. */
-function ts_get_tx_verbose(array $net, string $txid, ?string $blockhash = null): ?array
+function lx_get_tx_verbose(array $net, string $txid, ?string $blockhash = null): ?array
 {
     $verbosity = !empty($net['rpc']['verbosity2']) ? 2 : true;
     $params = [$txid, $verbosity];
     if ($blockhash !== null) {
         $params[] = $blockhash;
     }
-    $res = ts_rpc_soft($net, 'getrawtransaction', $params);
+    $res = lx_rpc_soft($net, 'getrawtransaction', $params);
     if ($res === null && $verbosity === 2) {
         // Node rejected verbosity 2 (older Core / litecoind): retry plain verbose.
         $params = [$txid, true];
         if ($blockhash !== null) {
             $params[] = $blockhash;
         }
-        $res = ts_rpc_soft($net, 'getrawtransaction', $params);
+        $res = lx_rpc_soft($net, 'getrawtransaction', $params);
     }
     return is_array($res) ? $res : null;
 }
 
 /** Resolve any vin prevouts that weren't inlined (no verbosity-2 support). */
-function ts_resolve_prevouts(array $net, array &$vin): void
+function lx_resolve_prevouts(array $net, array &$vin): void
 {
     $need = [];           // distinct prev txid -> list of vin indexes
     foreach ($vin as $i => $in) {
@@ -219,7 +219,7 @@ function ts_resolve_prevouts(array $net, array &$vin): void
     foreach ($txids as $tid) {
         $calls[] = ['getrawtransaction', [$tid, true]];
     }
-    $results = ts_rpc_batch($net, $calls);
+    $results = lx_rpc_batch($net, $calls);
     foreach ($txids as $k => $tid) {
         $prevtx = $results[$k];
         if (!is_array($prevtx) || !isset($prevtx['vout'])) {
@@ -229,7 +229,7 @@ function ts_resolve_prevouts(array $net, array &$vin): void
             $voutN = $vin[$i]['vout'];
             if (isset($prevtx['vout'][$voutN])) {
                 $pv = $prevtx['vout'][$voutN];
-                $vin[$i]['prevout'] = ts_map_spk($pv['scriptPubKey'] ?? [], $pv['value'] ?? 0);
+                $vin[$i]['prevout'] = lx_map_spk($pv['scriptPubKey'] ?? [], $pv['value'] ?? 0);
             }
         }
     }
@@ -239,9 +239,9 @@ function ts_resolve_prevouts(array $net, array &$vin): void
  * Map a Core verbose tx into the Esplora tx object. When $deferPrevouts is true
  * the per-tx prevout batch is skipped, leaving unresolved vin['prevout'] === null
  * (and fee possibly 0) so a caller can resolve prevouts for many txs in ONE batch
- * via ts_resolve_prevouts_multi(). The single-tx path leaves it false.
+ * via lx_resolve_prevouts_multi(). The single-tx path leaves it false.
  */
-function ts_map_tx(array $net, array $t, bool $deferPrevouts = false): array
+function lx_map_tx(array $net, array $t, bool $deferPrevouts = false): array
 {
     $coinbaseTx = false;
     $vin = [];
@@ -272,7 +272,7 @@ function ts_map_tx(array $net, array $t, bool $deferPrevouts = false): array
         ];
         if (isset($in['prevout']) && is_array($in['prevout'])) {
             $po = $in['prevout'];
-            $item['prevout'] = ts_map_spk($po['scriptPubKey'] ?? [], $po['value'] ?? 0);
+            $item['prevout'] = lx_map_spk($po['scriptPubKey'] ?? [], $po['value'] ?? 0);
         }
         $vin[$idx] = $item;
     }
@@ -280,12 +280,12 @@ function ts_map_tx(array $net, array $t, bool $deferPrevouts = false): array
     $vin = array_values($vin);
 
     if (!$deferPrevouts) {
-        ts_resolve_prevouts($net, $vin);
+        lx_resolve_prevouts($net, $vin);
     }
 
     $vout = [];
     foreach ($t['vout'] as $o) {
-        $vout[] = ts_map_spk($o['scriptPubKey'] ?? [], $o['value'] ?? 0);
+        $vout[] = lx_map_spk($o['scriptPubKey'] ?? [], $o['value'] ?? 0);
     }
 
     // fee
@@ -318,7 +318,7 @@ function ts_map_tx(array $net, array $t, bool $deferPrevouts = false): array
     if (!empty($t['blockhash'])) {
         $status = [
             'confirmed'    => true,
-            'block_height' => ts_block_height_for_hash($net, $t['blockhash']),
+            'block_height' => lx_block_height_for_hash($net, $t['blockhash']),
             'block_hash'   => $t['blockhash'],
             'block_time'   => (int) ($t['blocktime'] ?? $t['time'] ?? 0),
         ];
@@ -348,7 +348,7 @@ function ts_map_tx(array $net, array $t, bool $deferPrevouts = false): array
  * poisons the cache with a transient null height or an unresolved-prevout fee.
  * Shared by the single-tx and batched builders so the gate can never drift.
  */
-function ts_cache_tx_if_confirmed(array $net, string $txid, array $tx): void
+function lx_cache_tx_if_confirmed(array $net, string $txid, array $tx): void
 {
     if (empty($tx['status']['confirmed']) || $tx['status']['block_height'] === null) {
         return;
@@ -358,7 +358,7 @@ function ts_cache_tx_if_confirmed(array $net, string $txid, array $tx): void
             return;   // fee unreliable
         }
     }
-    $depth = ts_tip_height($net) - (int) $tx['status']['block_height'];
+    $depth = lx_tip_height($net) - (int) $tx['status']['block_height'];
     // Cap even deep confirmations at 1 day rather than forever: this cache is
     // keyed by TXID (not block hash), so a deep reorg that moves a tx to a
     // different block would otherwise be pinned permanently. A finite TTL
@@ -367,7 +367,7 @@ function ts_cache_tx_if_confirmed(array $net, string $txid, array $tx): void
 }
 
 /** Build (and cache, if confirmed) the Esplora tx for a txid. */
-function ts_esplora_tx(array $net, string $txid, ?string $blockhash = null): ?array
+function lx_esplora_tx(array $net, string $txid, ?string $blockhash = null): ?array
 {
     $ckey = 'etx:' . $net['slug'] . ':' . $txid;
     $hit = cache_get($ckey);
@@ -377,12 +377,12 @@ function ts_esplora_tx(array $net, string $txid, ?string $blockhash = null): ?ar
             return $d;
         }
     }
-    $vtx = ts_get_tx_verbose($net, $txid, $blockhash);
+    $vtx = lx_get_tx_verbose($net, $txid, $blockhash);
     if (!$vtx) {
         return null;
     }
-    $tx = ts_map_tx($net, $vtx);
-    ts_cache_tx_if_confirmed($net, $txid, $tx);
+    $tx = lx_map_tx($net, $vtx);
+    lx_cache_tx_if_confirmed($net, $txid, $tx);
     return $tx;
 }
 
@@ -392,10 +392,10 @@ function ts_esplora_tx(array $net, string $txid, ?string $blockhash = null): ?ar
  * cross-tx prevout batch (the no-verbosity-2 / LTC lane) instead of one per tx.
  * Returns a txid => tx map; missing/unresolvable txids are simply absent, and
  * callers preserve their own ordering. Confirmed bodies are cached via the same
- * gate as ts_esplora_tx. This collapses the former 25-serial-RPC list pages
+ * gate as lx_esplora_tx. This collapses the former 25-serial-RPC list pages
  * (block/address/scripthash txs) to 1 (BTC verbosity-2) or 1+1 (LTC) round-trips.
  */
-function ts_esplora_txs(array $net, array $txids, ?string $blockhash = null): array
+function lx_esplora_txs(array $net, array $txids, ?string $blockhash = null): array
 {
     $out  = [];
     $miss = [];
@@ -425,7 +425,7 @@ function ts_esplora_txs(array $net, array $txids, ?string $blockhash = null): ar
         }
         $calls[] = ['getrawtransaction', $p];
     }
-    $raw = ts_rpc_batch($net, $calls);
+    $raw = lx_rpc_batch($net, $calls);
 
     // verbosity-2 wholesale rejection (older Core): re-fetch the nulls plain.
     if ($verbosity === 2) {
@@ -442,7 +442,7 @@ function ts_esplora_txs(array $net, array $txids, ?string $blockhash = null): ar
             }
         }
         if ($retry) {
-            $rr = ts_rpc_batch($net, $retry);
+            $rr = lx_rpc_batch($net, $retry);
             foreach ($retryIdx as $j => $k) {
                 if ($rr[$j] !== null) {
                     $raw[$k] = $rr[$j];
@@ -455,16 +455,16 @@ function ts_esplora_txs(array $net, array $txids, ?string $blockhash = null): ar
     $mapped = [];
     foreach ($missTxids as $k => $tid) {
         if (is_array($raw[$k])) {
-            $mapped[$tid] = ts_map_tx($net, $raw[$k], true);
+            $mapped[$tid] = lx_map_tx($net, $raw[$k], true);
         }
     }
 
     // 3) Resolve every deferred prevout in ONE batch + finalize fees.
-    ts_resolve_prevouts_multi($net, $mapped);
+    lx_resolve_prevouts_multi($net, $mapped);
 
     // 4) Cache confirmed bodies and merge into the output map.
     foreach ($mapped as $tid => $tx) {
-        ts_cache_tx_if_confirmed($net, $tid, $tx);
+        lx_cache_tx_if_confirmed($net, $tid, $tx);
         $out[$tid] = $tx;
     }
     return $out;
@@ -477,7 +477,7 @@ function ts_esplora_txs(array $net, array $txids, ?string $blockhash = null): ar
  * verbosity-2 lane prevouts are already inlined, so $need is empty and only the
  * (exact, identical) fee finalize runs.
  */
-function ts_resolve_prevouts_multi(array $net, array &$txs): void
+function lx_resolve_prevouts_multi(array $net, array &$txs): void
 {
     $need = [];   // prevTxid => list of [txid, vinIndex]
     foreach ($txs as $tid => $tx) {
@@ -494,7 +494,7 @@ function ts_resolve_prevouts_multi(array $net, array &$txs): void
         foreach ($prevTxids as $ptid) {
             $calls[] = ['getrawtransaction', [$ptid, true]];
         }
-        $res = ts_rpc_batch($net, $calls);
+        $res = lx_rpc_batch($net, $calls);
         foreach ($prevTxids as $k => $ptid) {
             $prevtx = $res[$k];
             if (!is_array($prevtx) || !isset($prevtx['vout'])) {
@@ -505,7 +505,7 @@ function ts_resolve_prevouts_multi(array $net, array &$txs): void
                 $voutN = $txs[$tid]['vin'][$vi]['vout'];
                 if (isset($prevtx['vout'][$voutN])) {
                     $pv = $prevtx['vout'][$voutN];
-                    $txs[$tid]['vin'][$vi]['prevout'] = ts_map_spk($pv['scriptPubKey'] ?? [], $pv['value'] ?? 0);
+                    $txs[$tid]['vin'][$vi]['prevout'] = lx_map_spk($pv['scriptPubKey'] ?? [], $pv['value'] ?? 0);
                 }
             }
         }
@@ -536,13 +536,13 @@ function ts_resolve_prevouts_multi(array $net, array &$txs): void
 }
 
 /** Raw tx hex (text body for /tx/:txid/hex). */
-function ts_tx_hex(array $net, string $txid, ?string $blockhash = null): ?string
+function lx_tx_hex(array $net, string $txid, ?string $blockhash = null): ?string
 {
     $params = [$txid, false];
     if ($blockhash !== null) {
         $params[] = $blockhash;
     }
-    $res = ts_rpc_soft($net, 'getrawtransaction', $params);
+    $res = lx_rpc_soft($net, 'getrawtransaction', $params);
     return is_string($res) ? $res : null;
 }
 
@@ -553,7 +553,7 @@ function ts_tx_hex(array $net, string $txid, ?string $blockhash = null): ?string
  * (OP_RETURN) are reported unspent without an RPC. Pass $resolve=false for a cheap
  * flags-only result (UI badges) that skips the spender lookup.
  */
-function ts_tx_outspends(array $net, array $tx, bool $resolve = true): array
+function lx_tx_outspends(array $net, array $tx, bool $resolve = true): array
 {
     // Short cache: spent-flags are mutable (an output can be spent any time), but
     // a cheap window stops a crawler re-running the per-output gettxout batch on
@@ -587,7 +587,7 @@ function ts_tx_outspends(array $net, array $tx, bool $resolve = true): array
         foreach ($chunk as $i) {
             $calls[] = ['gettxout', [$tx['txid'], $i, true]];
         }
-        $res = ts_rpc_batch($net, $calls);
+        $res = lx_rpc_batch($net, $calls);
         foreach ($chunk as $k => $i) {
             if (($res[$k] ?? null) === null) {
                 $spentIdx[] = $i;          // spent -> resolve the spender below
@@ -607,7 +607,7 @@ function ts_tx_outspends(array $net, array $tx, bool $resolve = true): array
         $txMemo   = [];
         $deadline = time() + 5; // ONE wall-clock budget shared across every spent output in this tx
         foreach ($spentIdx as $i) {
-            $out[$i] = ts_resolve_outspend(
+            $out[$i] = lx_resolve_outspend(
                 $net,
                 $tx['txid'],
                 $i,
@@ -635,7 +635,7 @@ function ts_tx_outspends(array $net, array $tx, bool $resolve = true): array
  * located (a transient electrum gap) - it never downgrades a spent output to unspent.
  * $histMemo (scripthash -> tx_hash[]) and $txMemo (txid -> esplora tx) are per-call caches.
  */
-function ts_resolve_outspend(array $net, string $txid, int $vout, string $spkHex, array &$histMemo, array &$txMemo, int $deadline = 0): array
+function lx_resolve_outspend(array $net, string $txid, int $vout, string $spkHex, array &$histMemo, array &$txMemo, int $deadline = 0): array
 {
     if ($spkHex === '' || strlen($spkHex) % 2 !== 0) {
         return ['spent' => true];
@@ -648,11 +648,11 @@ function ts_resolve_outspend(array $net, string $txid, int $vout, string $spkHex
     if ($deadline <= 0) {
         $deadline = time() + 4;
     }
-    $cap = (int) (ts_config()['outspend_walk_limit'] ?? 200);
+    $cap = (int) (lx_config()['outspend_walk_limit'] ?? 200);
     $sh = bin2hex(strrev(hash('sha256', hex2bin($spkHex), true)));
     if (!array_key_exists($sh, $histMemo)) {
         $ids = [];
-        foreach ((ts_scripthash_history($net, $sh) ?? []) as $h) {
+        foreach ((lx_scripthash_history($net, $sh) ?? []) as $h) {
             $tid = $h['tx_hash'] ?? '';
             if ($tid !== '' && $tid !== $txid) {
                 $ids[] = $tid;
@@ -669,7 +669,7 @@ function ts_resolve_outspend(array $net, string $txid, int $vout, string $spkHex
             break;
         }
         if (!array_key_exists($cand, $txMemo)) {
-            $txMemo[$cand] = ts_find_tx($net, $cand);
+            $txMemo[$cand] = lx_find_tx($net, $cand);
         }
         $ctx = $txMemo[$cand];
         if (!is_array($ctx) || empty($ctx['vin'])) {
@@ -696,7 +696,7 @@ function ts_resolve_outspend(array $net, string $txid, int $vout, string $spkHex
  * than the batch when a caller needs a single output (e.g. a swap maker polling its HTLC
  * output): it resolves the spender for that output only.
  */
-function ts_tx_outspend(array $net, array $tx, int $vout): array
+function lx_tx_outspend(array $net, array $tx, int $vout): array
 {
     if (!isset($tx['vout'][$vout])) {
         return ['spent' => false];
@@ -715,23 +715,23 @@ function ts_tx_outspend(array $net, array $tx, int $vout): array
             return $d;
         }
     }
-    $res = ts_rpc_batch($net, [['gettxout', [$tx['txid'], $vout, true]]]);
+    $res = lx_rpc_batch($net, [['gettxout', [$tx['txid'], $vout, true]]]);
     if (($res[0] ?? null) !== null) {
         $r = ['spent' => false];   // still in the UTXO set
     } else {
         $histMemo = [];
         $txMemo   = [];
-        $r = ts_resolve_outspend($net, $tx['txid'], $vout, $spk, $histMemo, $txMemo);
+        $r = lx_resolve_outspend($net, $tx['txid'], $vout, $spk, $histMemo, $txMemo);
     }
     cache_set($ckey, json_encode($r, JSON_UNESCAPED_SLASHES), 15);
     return $r;
 }
 
 /** Merkle inclusion proof (/tx/:txid/merkle-proof) via electrs. */
-function ts_tx_merkle(array $net, string $txid, int $height): ?array
+function lx_tx_merkle(array $net, string $txid, int $height): ?array
 {
     try {
-        $r = ts_electrum($net)->request('blockchain.transaction.get_merkle', [$txid, $height]);
+        $r = lx_electrum($net)->request('blockchain.transaction.get_merkle', [$txid, $height]);
     } catch (Throwable $e) {
         return null;
     }
@@ -748,7 +748,7 @@ function ts_tx_merkle(array $net, string $txid, int $height): ?array
 // ---- block ----------------------------------------------------------------
 
 /** Esplora block summary for a hash (cached forever, immutable per hash). */
-function ts_esplora_block(array $net, string $hash): ?array
+function lx_esplora_block(array $net, string $hash): ?array
 {
     $ckey = 'eblk:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($ckey);
@@ -758,7 +758,7 @@ function ts_esplora_block(array $net, string $hash): ?array
             return $d;
         }
     }
-    $b = ts_rpc_soft($net, 'getblock', [$hash, 1]);
+    $b = lx_rpc_soft($net, 'getblock', [$hash, 1]);
     if (!is_array($b)) {
         return null;
     }
@@ -782,7 +782,7 @@ function ts_esplora_block(array $net, string $hash): ?array
 }
 
 /** Ordered list of txids in a block (cached forever per hash). */
-function ts_block_txids(array $net, string $hash): ?array
+function lx_block_txids(array $net, string $hash): ?array
 {
     $ckey = 'btxids:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($ckey);
@@ -792,7 +792,7 @@ function ts_block_txids(array $net, string $hash): ?array
             return $d;
         }
     }
-    $b = ts_rpc_soft($net, 'getblock', [$hash, 1]);
+    $b = lx_rpc_soft($net, 'getblock', [$hash, 1]);
     if (!is_array($b) || !isset($b['tx'])) {
         return null;
     }
@@ -801,14 +801,14 @@ function ts_block_txids(array $net, string $hash): ?array
 }
 
 /** A page of 25 full Esplora txs from a block, starting at $start. */
-function ts_block_txs(array $net, string $hash, int $start = 0): ?array
+function lx_block_txs(array $net, string $hash, int $start = 0): ?array
 {
-    $txids = ts_block_txids($net, $hash);
+    $txids = lx_block_txids($net, $hash);
     if ($txids === null) {
         return null;
     }
     $slice = array_slice($txids, $start, 25);
-    $map = ts_esplora_txs($net, $slice, $hash);   // one batch, not 25 serial RPCs
+    $map = lx_esplora_txs($net, $slice, $hash);   // one batch, not 25 serial RPCs
     $out = [];
     foreach ($slice as $txid) {
         if (isset($map[$txid])) {
@@ -819,9 +819,9 @@ function ts_block_txs(array $net, string $hash, int $start = 0): ?array
 }
 
 /** Chain-membership status of a block (/block/:hash/status). */
-function ts_block_status(array $net, string $hash): ?array
+function lx_block_status(array $net, string $hash): ?array
 {
-    $hdr = ts_rpc_soft($net, 'getblockheader', [$hash, true]);
+    $hdr = lx_rpc_soft($net, 'getblockheader', [$hash, true]);
     if (!is_array($hdr) || !isset($hdr['height'])) {
         return null;
     }
@@ -834,17 +834,17 @@ function ts_block_status(array $net, string $hash): ?array
 }
 
 /** Esplora /blocks[/:start_height]: up to 10 block summaries, descending. */
-function ts_recent_blocks(array $net, ?int $startHeight = null, int $count = 10): array
+function lx_recent_blocks(array $net, ?int $startHeight = null, int $count = 10): array
 {
-    $tip = ts_tip_height($net);
+    $tip = lx_tip_height($net);
     $start = $startHeight === null ? $tip : min($startHeight, $tip);
     $heights = [];
     for ($h = $start; $h > $start - $count && $h >= 0; $h--) { $heights[] = $h; }
-    $hashes = ts_block_hashes($net, $heights);   // one batched getblockhash for the misses
+    $hashes = lx_block_hashes($net, $heights);   // one batched getblockhash for the misses
     $out = [];
     foreach ($heights as $h) {
         if (!isset($hashes[$h])) { break; }
-        $blk = ts_esplora_block($net, $hashes[$h]);   // bodies are immutable-cached; only new blocks are cold
+        $blk = lx_esplora_block($net, $hashes[$h]);   // bodies are immutable-cached; only new blocks are cold
         if ($blk) { $out[] = $blk; }
     }
     return $out;
@@ -861,9 +861,9 @@ function ts_recent_blocks(array $net, ?int $startHeight = null, int $count = 10)
  * tx_count exact while the per-output breakdown is approximate. This also
  * defuses the unauthenticated walk-amplification DoS.
  */
-function ts_stats_for_scripthash(array $net, string $sh, callable $match, string $keyName, string $keyVal): ?array
+function lx_stats_for_scripthash(array $net, string $sh, callable $match, string $keyName, string $keyVal): ?array
 {
-    $history = ts_scripthash_history($net, $sh);
+    $history = lx_scripthash_history($net, $sh);
     if ($history === null) {
         return null;   // electrs unavailable - never report a false zero balance
     }
@@ -893,8 +893,8 @@ function ts_stats_for_scripthash(array $net, string $sh, callable $match, string
         }
     }
 
-    $cap       = (int) (ts_config()['address_tx_cap'] ?? 5000);
-    $walkLimit = (int) (ts_config()['address_walk_limit'] ?? 500);
+    $cap       = (int) (lx_config()['address_tx_cap'] ?? 5000);
+    $walkLimit = (int) (lx_config()['address_walk_limit'] ?? 500);
     $empty = [
         'funded_txo_count' => 0, 'funded_txo_sum' => 0,
         'spent_txo_count'  => 0, 'spent_txo_sum'  => 0,
@@ -909,7 +909,7 @@ function ts_stats_for_scripthash(array $net, string $sh, callable $match, string
         // Too large to walk synchronously, so keep balance exact via electrs,
         // approximate the funded/spent breakdown.
         try {
-            $bal = ts_electrum($net)->request('blockchain.scripthash.get_balance', [$sh]);
+            $bal = lx_electrum($net)->request('blockchain.scripthash.get_balance', [$sh]);
         } catch (Throwable $e) {
             $bal = null;
         }
@@ -924,7 +924,7 @@ function ts_stats_for_scripthash(array $net, string $sh, callable $match, string
         $mem2['funded_txo_count']  = count($mem);
     } else {
         $deadline = time() + 6; // wall-clock budget, never pin a worker
-        // Batch the resolution in chunks of 25 (via ts_esplora_txs) so a cold page
+        // Batch the resolution in chunks of 25 (via lx_esplora_txs) so a cold page
         // is a handful of round-trips, not ~500 serial getrawtransaction calls that
         // would pin an FPM worker and let an attacker amplify a single GET into
         // hundreds of RPCs. Confirmed bodies are cached, so warm walks are cheap.
@@ -933,7 +933,7 @@ function ts_stats_for_scripthash(array $net, string $sh, callable $match, string
                 if (time() > $deadline) {
                     break;
                 }
-                $map = ts_esplora_txs($net, $chunk);
+                $map = lx_esplora_txs($net, $chunk);
                 foreach ($chunk as $txid) {
                     if (!isset($map[$txid])) {
                         continue;
@@ -965,9 +965,9 @@ function ts_stats_for_scripthash(array $net, string $sh, callable $match, string
 }
 
 /** Esplora /address/:addr: chain_stats + mempool_stats. */
-function ts_address_stats(array $net, string $address): ?array
+function lx_address_stats(array $net, string $address): ?array
 {
-    $spk = ts_address_to_scriptpubkey($net, $address);
+    $spk = lx_address_to_scriptpubkey($net, $address);
     if ($spk === null) {
         return null;
     }
@@ -975,7 +975,7 @@ function ts_address_stats(array $net, string $address): ?array
     $match = function ($h) use ($spk) {
         return $h === $spk;
     };
-    return ts_stats_for_scripthash($net, $sh, $match, 'address', $address);
+    return lx_stats_for_scripthash($net, $sh, $match, 'address', $address);
 }
 
 /**
@@ -984,14 +984,14 @@ function ts_address_stats(array $net, string $address): ?array
  *   mode 'chain'   -> 25 confirmed after $afterTxid (or newest 25 if null)
  *   mode 'mempool' -> mempool txs only
  */
-function ts_address_txs(array $net, string $address, string $mode = 'all', ?string $afterTxid = null): ?array
+function lx_address_txs(array $net, string $address, string $mode = 'all', ?string $afterTxid = null): ?array
 {
-    $spk = ts_address_to_scriptpubkey($net, $address);
+    $spk = lx_address_to_scriptpubkey($net, $address);
     if ($spk === null) {
         return null;
     }
     $sh = bin2hex(strrev(hash('sha256', hex2bin($spk), true)));
-    $history = ts_scripthash_history($net, $sh);   // cached (coalesces repeated polls)
+    $history = lx_scripthash_history($net, $sh);   // cached (coalesces repeated polls)
     if ($history === null) {
         return null;   // electrs unavailable - don't fake an empty tx list
     }
@@ -1032,7 +1032,7 @@ function ts_address_txs(array $net, string $address, string $mode = 'all', ?stri
             $order[] = $txid;
         }
     }
-    $map = ts_esplora_txs($net, $order);
+    $map = lx_esplora_txs($net, $order);
     $out = [];
     foreach ($order as $txid) {
         if (isset($map[$txid])) {
@@ -1043,14 +1043,14 @@ function ts_address_txs(array $net, string $address, string $mode = 'all', ?stri
 }
 
 /** Esplora /address/:addr/utxo via electrs listunspent (scripthash-cached). */
-function ts_address_utxos(array $net, string $address): ?array
+function lx_address_utxos(array $net, string $address): ?array
 {
-    $spk = ts_address_to_scriptpubkey($net, $address);
+    $spk = lx_address_to_scriptpubkey($net, $address);
     if ($spk === null) {
         return null;
     }
     $sh = bin2hex(strrev(hash('sha256', hex2bin($spk), true)));
-    return ts_scripthash_utxos($net, $sh);
+    return lx_scripthash_utxos($net, $sh);
 }
 
 // ---- mempool --------------------------------------------------------------
@@ -1060,18 +1060,18 @@ function ts_address_utxos(array $net, string $address): ?array
  * projected-block packing and recent-tx paths reuse one heavy fetch instead of
  * each issuing their own getrawmempool(true) on the same request.
  */
-function ts_mempool_verbose(array $net): array
+function lx_mempool_verbose(array $net): array
 {
     return cache_remember('memverbose:' . $net['slug'], 5, function () use ($net) {
-        $r = ts_rpc_soft($net, 'getrawmempool', [true]);
+        $r = lx_rpc_soft($net, 'getrawmempool', [true]);
         return is_array($r) ? $r : [];
     });
 }
 
-function ts_esplora_mempool(array $net): array
+function lx_esplora_mempool(array $net): array
 {
     return cache_remember('mempool:' . $net['slug'], 5, function () use ($net) {
-        $info  = ts_rpc_soft($net, 'getmempoolinfo') ?: [];
+        $info  = lx_rpc_soft($net, 'getmempoolinfo') ?: [];
         $count = (int) ($info['size'] ?? 0);
         $vsize = (int) ($info['bytes'] ?? 0);
         $totalFee = isset($info['total_fee']) ? coin_to_sat($info['total_fee']) : 0;
@@ -1081,7 +1081,7 @@ function ts_esplora_mempool(array $net): array
         // serve a fee histogram, so derive both from getrawmempool(true) in one
         // pass (bounded by mempool size; the 5s cache absorbs the cost).
         if ($count > 0) {
-            $verbose = ts_mempool_verbose($net);
+            $verbose = lx_mempool_verbose($net);
             if ($verbose) {
                 $sum = 0;
                 $byRate = [];              // feerate (int sat/vB) -> summed vsize
@@ -1117,17 +1117,17 @@ function ts_esplora_mempool(array $net): array
     });
 }
 
-function ts_mempool_txids(array $net): array
+function lx_mempool_txids(array $net): array
 {
-    $r = ts_rpc_soft($net, 'getrawmempool', [false]);
+    $r = lx_rpc_soft($net, 'getrawmempool', [false]);
     return is_array($r) ? array_values($r) : [];
 }
 
 /** Esplora /mempool/recent: up to 10 entries with output-value sums. */
-function ts_mempool_recent(array $net): array
+function lx_mempool_recent(array $net): array
 {
     return cache_remember('memrecent:' . $net['slug'], 5, function () use ($net) {
-        $r = ts_mempool_verbose($net);
+        $r = lx_mempool_verbose($net);
         if (!$r) {
             return [];
         }
@@ -1145,7 +1145,7 @@ function ts_mempool_recent(array $net): array
         foreach ($entries as $en) {
             $calls[] = ['getrawtransaction', [$en[0], true]];
         }
-        $txs = $calls ? ts_rpc_batch($net, $calls) : [];
+        $txs = $calls ? lx_rpc_batch($net, $calls) : [];
 
         $out = [];
         foreach ($entries as $i => $en) {
@@ -1172,9 +1172,9 @@ function ts_mempool_recent(array $net): array
 // ---- fees -----------------------------------------------------------------
 
 /** estimatesmartfee(target) -> sat/vB, or null if the node can't estimate. */
-function ts_smartfee_satvb(array $net, int $blocks)
+function lx_smartfee_satvb(array $net, int $blocks)
 {
-    $r = ts_rpc_soft($net, 'estimatesmartfee', [$blocks]);
+    $r = lx_rpc_soft($net, 'estimatesmartfee', [$blocks]);
     if (is_array($r) && isset($r['feerate']) && $r['feerate'] > 0) {
         return $r['feerate'] * 100000.0; // BTC/kvB -> sat/vB
     }
@@ -1182,7 +1182,7 @@ function ts_smartfee_satvb(array $net, int $blocks)
 }
 
 /** Esplora /fee-estimates: {target: sat/vB}. */
-function ts_fee_estimates(array $net): array
+function lx_fee_estimates(array $net): array
 {
     return cache_remember('fees:' . $net['slug'], 60, function () use ($net) {
         $targets = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
@@ -1192,7 +1192,7 @@ function ts_fee_estimates(array $net): array
         foreach ($targets as $t) {
             $calls[] = ['estimatesmartfee', [$t]];
         }
-        $res = ts_rpc_batch($net, $calls);
+        $res = lx_rpc_batch($net, $calls);
         // Seed with the FIRST real estimate: on sparse testnets Core often can't
         // estimate the 1-block target but can estimate larger ones. Without this,
         // a missing target-1 seeded $last=1.0 and the non-increasing clamp then
@@ -1227,17 +1227,17 @@ function ts_fee_estimates(array $net): array
 }
 
 /** mempool.space /v1/fees/recommended extension. */
-function ts_fees_recommended(array $net): array
+function lx_fees_recommended(array $net): array
 {
     return cache_remember('feesrec:' . $net['slug'], 60, function () use ($net) {
-        $info = ts_rpc_soft($net, 'getmempoolinfo') ?: [];
+        $info = lx_rpc_soft($net, 'getmempoolinfo') ?: [];
         $minfee = isset($info['mempoolminfee'])
             ? max(1, (int) ceil($info['mempoolminfee'] * 100000.0))
             : 1;
-        $fastest = ts_smartfee_satvb($net, 1);
-        $half    = ts_smartfee_satvb($net, 3);
-        $hour    = ts_smartfee_satvb($net, 6);
-        $econ    = ts_smartfee_satvb($net, 144);
+        $fastest = lx_smartfee_satvb($net, 1);
+        $half    = lx_smartfee_satvb($net, 3);
+        $hour    = lx_smartfee_satvb($net, 6);
+        $econ    = lx_smartfee_satvb($net, 144);
 
         $fastest = $fastest === null ? $minfee : max($minfee, (int) ceil($fastest));
         $half    = $half === null ? $fastest : max($minfee, (int) ceil($half));
@@ -1262,7 +1262,7 @@ function ts_fees_recommended(array $net): array
 // ---- broadcast ------------------------------------------------------------
 
 /** POST /tx: returns [txid] or [null, errorMessage]. */
-function ts_broadcast(array $net, string $rawhex): array
+function lx_broadcast(array $net, string $rawhex): array
 {
     $rawhex = trim($rawhex);
     if (strlen($rawhex) > 4200000) {
@@ -1272,7 +1272,7 @@ function ts_broadcast(array $net, string $rawhex): array
         return [null, 'invalid transaction hex'];
     }
     try {
-        $txid = ts_rpc($net, 'sendrawtransaction', [$rawhex]);
+        $txid = lx_rpc($net, 'sendrawtransaction', [$rawhex]);
         return [is_string($txid) ? $txid : null, null];
     } catch (RpcException $e) {
         // Surface only Core's application-level rejection (rpcCode != 0, e.g.
@@ -1289,7 +1289,7 @@ function ts_broadcast(array $net, string $rawhex): array
  * ['error'=>str]. $maxfeerate is an optional sat/vB ceiling (converted to the
  * BTC/kvB the RPC expects); empty uses the node default (0.10 BTC/kvB).
  */
-function ts_test_mempool_accept(array $net, string $rawhex, $maxfeerate = null): array
+function lx_test_mempool_accept(array $net, string $rawhex, $maxfeerate = null): array
 {
     $rawhex = trim($rawhex);
     if (strlen($rawhex) > 4200000) {
@@ -1303,7 +1303,7 @@ function ts_test_mempool_accept(array $net, string $rawhex, $maxfeerate = null):
         $params[] = (float) $maxfeerate * 0.00001;   // sat/vB -> BTC/kvB
     }
     try {
-        $res = ts_rpc($net, 'testmempoolaccept', $params);
+        $res = lx_rpc($net, 'testmempoolaccept', $params);
         if (!is_array($res) || !isset($res[0]) || !is_array($res[0])) {
             return ['error' => 'unexpected node response'];
         }
@@ -1321,28 +1321,28 @@ function ts_test_mempool_accept(array $net, string $rawhex, $maxfeerate = null):
 }
 
 /** Decode a raw tx hex into the Esplora shape (no broadcast) for the tools page. */
-function ts_decode_rawtx(array $net, string $hex): ?array
+function lx_decode_rawtx(array $net, string $hex): ?array
 {
     $hex = trim($hex);
     if ($hex === '' || strlen($hex) > 4200000 || !ctype_xdigit($hex) || strlen($hex) % 2 !== 0) {
         return null;
     }
-    $dec = ts_rpc_soft($net, 'decoderawtransaction', [$hex]);
+    $dec = lx_rpc_soft($net, 'decoderawtransaction', [$hex]);
     if (!is_array($dec) || !isset($dec['vin'], $dec['vout'])) {
         return null;
     }
-    // ts_map_tx resolves prevouts (if the referenced outputs exist) and the fee;
+    // lx_map_tx resolves prevouts (if the referenced outputs exist) and the fee;
     // there's no blockhash, so status is unconfirmed.
-    return ts_map_tx($net, $dec);
+    return lx_map_tx($net, $dec);
 }
 
 // ---- no-txindex fallbacks -------------------------------------------------
 
 /** electrs extension: confirming block hash of a txid (works without txindex). */
-function ts_get_confirmed_blockhash(array $net, string $txid): ?string
+function lx_get_confirmed_blockhash(array $net, string $txid): ?string
 {
     try {
-        $r = ts_electrum($net)->request('blockchain.transaction.get_confirmed_blockhash', [$txid]);
+        $r = lx_electrum($net)->request('blockchain.transaction.get_confirmed_blockhash', [$txid]);
     } catch (Throwable $e) {
         return null;
     }
@@ -1353,7 +1353,7 @@ function ts_get_confirmed_blockhash(array $net, string $txid): ?string
 }
 
 /** Resolve a tx even if the node lacks txindex (ask electrs for its block). */
-function ts_find_tx(array $net, string $txid): ?array
+function lx_find_tx(array $net, string $txid): ?array
 {
     // Negative-cache "not found" briefly: a flood of nonexistent-but-hex txids (WS track-tx
     // spam, /search probes) otherwise re-hits getrawtransaction + the electrs confirmed-blockhash
@@ -1362,32 +1362,32 @@ function ts_find_tx(array $net, string $txid): ?array
     if (cache_get($nk) !== null) {
         return null;
     }
-    $tx = ts_esplora_tx($net, $txid);
+    $tx = lx_esplora_tx($net, $txid);
     if ($tx) {
         return $tx;
     }
-    $bh = ts_get_confirmed_blockhash($net, $txid);
+    $bh = lx_get_confirmed_blockhash($net, $txid);
     if ($bh) {
-        return ts_esplora_tx($net, $txid, $bh);
+        return lx_esplora_tx($net, $txid, $bh);
     }
     cache_set($nk, '1', 30);
     return null;
 }
 
 /** Raw hex with the same no-txindex fallback. */
-function ts_find_tx_hex(array $net, string $txid): ?string
+function lx_find_tx_hex(array $net, string $txid): ?string
 {
-    $hex = ts_tx_hex($net, $txid);
+    $hex = lx_tx_hex($net, $txid);
     if ($hex !== null) {
         return $hex;
     }
-    $bh = ts_get_confirmed_blockhash($net, $txid);
-    return $bh ? ts_tx_hex($net, $txid, $bh) : null;
+    $bh = lx_get_confirmed_blockhash($net, $txid);
+    return $bh ? lx_tx_hex($net, $txid, $bh) : null;
 }
 
 // ---- scripthash endpoints (full Esplora compat) ---------------------------
 
-function ts_scripthash_history(array $net, string $sh): ?array
+function lx_scripthash_history(array $net, string $sh): ?array
 {
     // Short server cache: the FULL history is fetched on every address/scripthash
     // stats + tx-list request (the astats fingerprint key is derived from it, so
@@ -1398,7 +1398,7 @@ function ts_scripthash_history(array $net, string $sh): ?array
     // array is a genuinely unused address.
     $cached = cache_remember('shist:' . $net['slug'] . ':' . $sh, 8, function () use ($net, $sh) {
         try {
-            $h = ts_electrum($net)->request('blockchain.scripthash.get_history', [$sh]);
+            $h = lx_electrum($net)->request('blockchain.scripthash.get_history', [$sh]);
         } catch (Throwable $e) {
             return null;   // electrs unreachable -> not cached; caller treats as unavailable
         }
@@ -1408,11 +1408,11 @@ function ts_scripthash_history(array $net, string $sh): ?array
 }
 
 /** Cached (~10s) electrs reachability probe, so views can show a degraded state instead of zeros. */
-function ts_electrum_reachable(array $net): bool
+function lx_electrum_reachable(array $net): bool
 {
     return (bool) cache_remember('electrumok:' . $net['slug'], 10, function () use ($net) {
         try {
-            ts_electrum($net)->request('server.ping');
+            lx_electrum($net)->request('server.ping');
             return true;
         } catch (Throwable $e) {
             return false;
@@ -1420,7 +1420,7 @@ function ts_electrum_reachable(array $net): bool
     });
 }
 
-function ts_scripthash_stats(array $net, string $sh): ?array
+function lx_scripthash_stats(array $net, string $sh): ?array
 {
     $match = function ($spkHex) use ($sh) {
         if ($spkHex === '') {
@@ -1428,12 +1428,12 @@ function ts_scripthash_stats(array $net, string $sh): ?array
         }
         return bin2hex(strrev(hash('sha256', hex2bin($spkHex), true))) === $sh;
     };
-    return ts_stats_for_scripthash($net, $sh, $match, 'scripthash', $sh);
+    return lx_stats_for_scripthash($net, $sh, $match, 'scripthash', $sh);
 }
 
-function ts_scripthash_txs(array $net, string $sh, string $mode = 'all', ?string $afterTxid = null): ?array
+function lx_scripthash_txs(array $net, string $sh, string $mode = 'all', ?string $afterTxid = null): ?array
 {
-    $history = ts_scripthash_history($net, $sh);
+    $history = lx_scripthash_history($net, $sh);
     if ($history === null) {
         return null;   // electrs unavailable
     }
@@ -1470,7 +1470,7 @@ function ts_scripthash_txs(array $net, string $sh, string $mode = 'all', ?string
             $order[] = $txid;
         }
     }
-    $map = ts_esplora_txs($net, $order);   // one batch, not one RPC per tx
+    $map = lx_esplora_txs($net, $order);   // one batch, not one RPC per tx
     $out = [];
     foreach ($order as $txid) {
         if (isset($map[$txid])) {
@@ -1480,7 +1480,7 @@ function ts_scripthash_txs(array $net, string $sh, string $mode = 'all', ?string
     return $out;
 }
 
-function ts_scripthash_utxos(array $net, string $sh): ?array
+function lx_scripthash_utxos(array $net, string $sh): ?array
 {
     // Short TTL: UTXOs are mutable, but wallets poll this repeatedly between
     // blocks. A few-second server cache collapses those polls without ever
@@ -1489,7 +1489,7 @@ function ts_scripthash_utxos(array $net, string $sh): ?array
     // unavailable so callers 503 rather than report a false "no coins".
     $cached = cache_remember('autxo:' . $net['slug'] . ':' . $sh, 10, function () use ($net, $sh) {
         try {
-            $utxos = ts_electrum($net)->request('blockchain.scripthash.listunspent', [$sh]);
+            $utxos = lx_electrum($net)->request('blockchain.scripthash.listunspent', [$sh]);
         } catch (Throwable $e) {
             return null;   // electrs unreachable
         }
@@ -1498,7 +1498,7 @@ function ts_scripthash_utxos(array $net, string $sh): ?array
         }
         $out = [];
         foreach ($utxos as $u) {
-            $out[] = ts_map_utxo_row($net, $u);
+            $out[] = lx_map_utxo_row($net, $u);
         }
         return $out;
     });
@@ -1508,13 +1508,13 @@ function ts_scripthash_utxos(array $net, string $sh): ?array
 // ---- mempool.space /v1 extensions -----------------------------------------
 
 /** /v1/validate-address/:address: Core validateaddress shape, from our codec. */
-function ts_validate_address(array $net, string $address): array
+function lx_validate_address(array $net, string $address): array
 {
-    $spk = ts_address_to_scriptpubkey($net, $address);
+    $spk = lx_address_to_scriptpubkey($net, $address);
     if ($spk === null) {
         return ['isvalid' => false, 'address' => $address];
     }
-    $type = ts_address_type($net, $address);
+    $type = lx_address_type($net, $address);
     $isScript = in_array($type, ['p2sh', 'v0_p2wsh'], true);
     $isWitness = strncmp($type, 'v0_', 3) === 0
         || strncmp($type, 'v1_', 3) === 0
@@ -1527,7 +1527,7 @@ function ts_validate_address(array $net, string $address): array
         'iswitness'    => $isWitness,
     ];
     if ($isWitness && !empty($net['bech32'])) {
-        $seg = ts_segwit_decode($net['bech32'], $address);
+        $seg = lx_segwit_decode($net['bech32'], $address);
         if ($seg !== null) {
             $out['witness_version'] = $seg[0];
             $out['witness_program'] = bin2hex($seg[1]);
@@ -1541,10 +1541,10 @@ function ts_validate_address(array $net, string $address): array
  * Note: on testnet the 20-minute minimum-difficulty rule makes
  * difficultyChange noisy; the structural fields stay accurate.
  */
-function ts_difficulty_adjustment(array $net): array
+function lx_difficulty_adjustment(array $net): array
 {
     return cache_remember('diffadj:' . $net['slug'], 60, function () use ($net) {
-        $height = (int) ts_rpc($net, 'getblockcount');
+        $height = (int) lx_rpc($net, 'getblockcount');
         $epoch = 2016;
         $targetSpacing = $net['coin'] === 'ltc' ? 150 : 600; // seconds per block
         $epochStart = intdiv($height, $epoch) * $epoch;
@@ -1557,10 +1557,10 @@ function ts_difficulty_adjustment(array $net): array
         $expectedBlocks = (float) $blocksInEpoch;
         $timeAvg = $targetSpacing * 1000;
         if ($blocksInEpoch > 0) {
-            $tipHash = ts_block_hash_at($net, $height);
-            $startHash = ts_block_hash_at($net, $epochStart);
-            $tipHdr = $tipHash ? ts_rpc_soft($net, 'getblockheader', [$tipHash, true]) : null;
-            $startHdr = $startHash ? ts_rpc_soft($net, 'getblockheader', [$startHash, true]) : null;
+            $tipHash = lx_block_hash_at($net, $height);
+            $startHash = lx_block_hash_at($net, $epochStart);
+            $tipHdr = $tipHash ? lx_rpc_soft($net, 'getblockheader', [$tipHash, true]) : null;
+            $startHdr = $startHash ? lx_rpc_soft($net, 'getblockheader', [$startHash, true]) : null;
             if (is_array($tipHdr) && is_array($startHdr)) {
                 $elapsed = (int) $tipHdr['time'] - (int) $startHdr['time'];
                 if ($elapsed > 0) {
@@ -1576,10 +1576,10 @@ function ts_difficulty_adjustment(array $net): array
         // difficulty at this epoch's start vs the prior epoch's start.
         $previousRetarget = 0.0;
         if ($epochStart >= $epoch) {
-            $h1 = ts_block_hash_at($net, $epochStart);
-            $h0 = ts_block_hash_at($net, $epochStart - $epoch);
-            $d1 = $h1 ? ts_rpc_soft($net, 'getblockheader', [$h1, true]) : null;
-            $d0 = $h0 ? ts_rpc_soft($net, 'getblockheader', [$h0, true]) : null;
+            $h1 = lx_block_hash_at($net, $epochStart);
+            $h0 = lx_block_hash_at($net, $epochStart - $epoch);
+            $d1 = $h1 ? lx_rpc_soft($net, 'getblockheader', [$h1, true]) : null;
+            $d0 = $h0 ? lx_rpc_soft($net, 'getblockheader', [$h0, true]) : null;
             if (is_array($d1) && is_array($d0) && (float) ($d0['difficulty'] ?? 0) > 0) {
                 $previousRetarget = (((float) $d1['difficulty'] / (float) $d0['difficulty']) - 1) * 100;
             }
@@ -1606,10 +1606,10 @@ function ts_difficulty_adjustment(array $net): array
  * headers). Cached ~30 min; the history is effectively immutable (a new epoch
  * lands only every ~2016 blocks). Returns newest-first, up to $n rows.
  */
-function ts_difficulty_epochs(array $net, int $n = 12): array
+function lx_difficulty_epochs(array $net, int $n = 12): array
 {
     $interval = 2016;
-    $tip = ts_tip_height($net);
+    $tip = lx_tip_height($net);
     if ($tip < $interval) {
         return [];
     }
@@ -1628,13 +1628,13 @@ function ts_difficulty_epochs(array $net, int $n = 12): array
     }
     $hashCalls = [];
     foreach ($heights as $h) { $hashCalls[] = ['getblockhash', [$h]]; }
-    $hashes = ts_rpc_batch($net, $hashCalls);
+    $hashes = lx_rpc_batch($net, $hashCalls);
     $hdrCalls = [];
     $validHeights = [];
     foreach ($hashes as $i => $hash) {
         if (is_string($hash)) { $hdrCalls[] = ['getblockheader', [$hash]]; $validHeights[] = $heights[$i]; }
     }
-    $hdrs = $hdrCalls ? ts_rpc_batch($net, $hdrCalls) : [];
+    $hdrs = $hdrCalls ? lx_rpc_batch($net, $hdrCalls) : [];
     $rows = [];
     foreach ($hdrs as $i => $hdr) {
         if (!is_array($hdr)) { continue; }
@@ -1669,10 +1669,10 @@ function ts_difficulty_epochs(array $net, int $n = 12): array
  * one-block "difficulty * 2^32 / target-spacing" estimate). Cached ~60s, soft;
  * returns 0.0 when unavailable so the caller can fall back.
  */
-function ts_network_hashrate(array $net, int $nblocks = 120): float
+function lx_network_hashrate(array $net, int $nblocks = 120): float
 {
     return (float) cache_remember('nethash:' . $net['slug'] . ':' . $nblocks, 60, function () use ($net, $nblocks) {
-        $r = ts_rpc_soft($net, 'getnetworkhashps', [$nblocks]);
+        $r = lx_rpc_soft($net, 'getnetworkhashps', [$nblocks]);
         return (is_int($r) || is_float($r)) && $r > 0 ? (float) $r : 0.0;
     });
 }
@@ -1684,13 +1684,13 @@ function ts_network_hashrate(array $net, int $nblocks = 120): float
  * schedule. Amounts are integer satoshis. Litecoin: 840k-block halving interval,
  * 84M cap, 50-LTC start, 150s target spacing.
  */
-function ts_supply_info(array $net): ?array
+function lx_supply_info(array $net): ?array
 {
     switch ($net['coin'] ?? '') {
         case 'ltc': $interval = 840000; $maxCoins = 84000000; $spacing = 150; break;
         default:    return null;
     }
-    $tip = ts_tip_height($net);
+    $tip = lx_tip_height($net);
     if ($tip < 0) {
         return null;
     }
@@ -1729,14 +1729,14 @@ function ts_supply_info(array $net): ?array
  * one getnetworkinfo, cached ~20s. Soft RPC (never throws); returns null only
  * when the chain info itself is unreachable, with network fields degrading to 0.
  */
-function ts_node_info(array $net): ?array
+function lx_node_info(array $net): ?array
 {
     return cache_remember('nodeinfo:' . $net['slug'], 20, function () use ($net) {
-        $bc = ts_rpc_soft($net, 'getblockchaininfo');
+        $bc = lx_rpc_soft($net, 'getblockchaininfo');
         if (!is_array($bc)) {
             return null;
         }
-        $nw = ts_rpc_soft($net, 'getnetworkinfo');
+        $nw = lx_rpc_soft($net, 'getnetworkinfo');
         $nw = is_array($nw) ? $nw : [];
         return [
             'chain'        => (string) ($bc['chain'] ?? ''),
@@ -1755,14 +1755,14 @@ function ts_node_info(array $net): ?array
 /**
  * Fuller node + chain + mempool + uptime bundle for the dedicated Node page.
  * All soft RPC (never throws on RPC-level errors); returns null only when the
- * daemon itself is unreachable. Cached ~15s. Superset of ts_node_info.
+ * daemon itself is unreachable. Cached ~15s. Superset of lx_node_info.
  */
-function ts_node_report(array $net): ?array
+function lx_node_report(array $net): ?array
 {
     return cache_remember('nodereport:' . $net['slug'], 15, function () use ($net) {
       try {
         // One batched round-trip instead of four serial RPCs.
-        $res = ts_rpc_batch($net, [
+        $res = lx_rpc_batch($net, [
             ['getblockchaininfo', []],
             ['getnetworkinfo', []],
             ['getmempoolinfo', []],
@@ -1816,7 +1816,7 @@ function ts_node_report(array $net): ?array
  * aid). IPv4 keeps the first two octets, IPv6 the first hextet, onion the first
  * few chars; the port is preserved. Returns [masked_addr, network_type].
  */
-function ts_mask_peer_addr(string $addr): array
+function lx_mask_peer_addr(string $addr): array
 {
     $host = $addr;
     $port = '';
@@ -1862,11 +1862,11 @@ function ts_mask_peer_addr(string $addr): array
  * page. Cached ~15s, soft. Sorts outbound first then oldest connection first.
  * Never throws: returns ok=false when the node is unreachable.
  */
-function ts_node_peers(array $net): array
+function lx_node_peers(array $net): array
 {
     return cache_remember('peers:' . $net['slug'], 15, function () use ($net) {
         try {
-            $raw = ts_rpc_soft($net, 'getpeerinfo');
+            $raw = lx_rpc_soft($net, 'getpeerinfo');
         } catch (Throwable $e) {
             $raw = null;   // node down: degrade to the "peers unavailable" state
         }
@@ -1881,7 +1881,7 @@ function ts_node_peers(array $net): array
             if (!is_array($x)) { continue; }
             $inbound = !empty($x['inbound']);
             if ($inbound) { $in++; } else { $out++; }
-            list($maddr, $ntype) = ts_mask_peer_addr((string) ($x['addr'] ?? ''));
+            list($maddr, $ntype) = lx_mask_peer_addr((string) ($x['addr'] ?? ''));
             if (isset($x['network']) && is_string($x['network']) && $x['network'] !== '') { $ntype = $x['network']; }
             $nets[$ntype] = ($nets[$ntype] ?? 0) + 1;
             $peers[] = [
@@ -1911,10 +1911,10 @@ function ts_node_peers(array $net): array
  * default call for older nodes that reject the argument. Cached 5 min, fully
  * soft (a slow scan or timeout degrades to null instead of 500-ing the page).
  */
-function ts_txoutset_info(array $net): ?array
+function lx_txoutset_info(array $net): ?array
 {
     // Read-only: serve ONLY the value warmed by the snapshot cron
-    // (ts_txoutset_refresh). We deliberately never compute inline here, because
+    // (lx_txoutset_refresh). We deliberately never compute inline here, because
     // gettxoutsetinfo scans the whole chainstate; a public /node hit must not be
     // able to trigger it (that would let requests pin FPM workers). Cold => null,
     // and the Node page renders a graceful "not available yet" state.
@@ -1929,7 +1929,7 @@ function ts_txoutset_info(array $net): ?array
  * Fully soft. Called by the snapshot cron so the Node page reads a warm value
  * instead of ever scanning inline on a request.
  */
-function ts_txoutset_refresh(array $net, bool $force = false): ?array
+function lx_txoutset_refresh(array $net, bool $force = false): ?array
 {
     $key = 'txoutset:' . $net['slug'];
     // Only scan when the warm value has expired. Litecoin Core (0.21 base) has NO
@@ -1954,9 +1954,9 @@ function ts_txoutset_refresh(array $net, bool $force = false): ?array
         // Long per-call timeout (20 min): cron-only warmer, and a coinstatsindex-less node
         // needs many minutes on a large chainstate that only grows. It's a CEILING, not a
         // fixed wait - the call returns the moment the scan finishes. 'none' skips the muhash.
-        $r = ts_rpc_soft($net, 'gettxoutsetinfo', ['none'], 1200);
+        $r = lx_rpc_soft($net, 'gettxoutsetinfo', ['none'], 1200);
         if (!is_array($r)) {
-            $r = ts_rpc_soft($net, 'gettxoutsetinfo', [], 1200);
+            $r = lx_rpc_soft($net, 'gettxoutsetinfo', [], 1200);
         }
     } catch (Throwable $e) {
         return null;
@@ -1986,14 +1986,14 @@ function ts_txoutset_refresh(array $net, bool $force = false): ?array
  * null if the block is unavailable (e.g. reorged out).
  */
 /** The getblockstats field filter (shared so single + batch paths agree). */
-function ts_blockstats_fields(): array
+function lx_blockstats_fields(): array
 {
     return ['height', 'txs', 'total_size', 'total_weight', 'totalfee', 'subsidy',
         'feerate_percentiles', 'minfeerate', 'maxfeerate', 'time', 'avgfeerate'];
 }
 
 /** Map a raw getblockstats result to our shape. */
-function ts_map_blockstats(array $s, string $hash, ?int $height): array
+function lx_map_blockstats(array $s, string $hash, ?int $height): array
 {
     $pct = $s['feerate_percentiles'] ?? [];   // [p10, p25, p50, p75, p90], sat/vB
     return [
@@ -2014,7 +2014,7 @@ function ts_map_blockstats(array $s, string $hash, ?int $height): array
     ];
 }
 
-function ts_block_stats(array $net, string $hash, ?int $height = null): ?array
+function lx_block_stats(array $net, string $hash, ?int $height = null): ?array
 {
     $ckey = 'bstats:' . $net['slug'] . ':' . $hash;
     $hit = cache_get($ckey);
@@ -2024,23 +2024,23 @@ function ts_block_stats(array $net, string $hash, ?int $height = null): ?array
             return $d;
         }
     }
-    $s = ts_rpc_soft($net, 'getblockstats', [$hash, ts_blockstats_fields()]);
+    $s = lx_rpc_soft($net, 'getblockstats', [$hash, lx_blockstats_fields()]);
     if (!is_array($s)) {
         return null;
     }
-    $out = ts_map_blockstats($s, $hash, $height);
-    $depth = ts_tip_height($net) - $out['height'];
+    $out = lx_map_blockstats($s, $hash, $height);
+    $depth = lx_tip_height($net) - $out['height'];
     cache_set($ckey, json_encode($out, JSON_UNESCAPED_SLASHES), $depth > 100 ? 0 : 600);
     return $out;
 }
 
 /** Newest-first list of getblockstats for the last $count blocks (for the strip). */
-function ts_recent_block_stats(array $net, int $count = 12): array
+function lx_recent_block_stats(array $net, int $count = 12): array
 {
-    $tip = ts_tip_height($net);
+    $tip = lx_tip_height($net);
     $heights = [];
     for ($h = $tip; $h > $tip - $count && $h >= 0; $h--) { $heights[] = $h; }
-    $hashes = ts_block_hashes($net, $heights);   // one batched getblockhash
+    $hashes = lx_block_hashes($net, $heights);   // one batched getblockhash
 
     // Serve cache hits; batch the misses' getblockstats in a single round-trip.
     $stats = [];
@@ -2057,13 +2057,13 @@ function ts_recent_block_stats(array $net, int $count = 12): array
     }
     if ($need) {
         $calls = [];
-        foreach ($need as $hash) { $calls[] = ['getblockstats', [$hash, ts_blockstats_fields()]]; }
-        $res = ts_rpc_batch($net, $calls);
+        foreach ($need as $hash) { $calls[] = ['getblockstats', [$hash, lx_blockstats_fields()]]; }
+        $res = lx_rpc_batch($net, $calls);
         $i = 0;
         foreach ($need as $h => $hash) {
             $s = $res[$i++] ?? null;
             if (is_array($s)) {
-                $mapped = ts_map_blockstats($s, $hash, $h);
+                $mapped = lx_map_blockstats($s, $hash, $h);
                 cache_set('bstats:' . $net['slug'] . ':' . $hash, json_encode($mapped, JSON_UNESCAPED_SLASHES), ($tip - $mapped['height']) > 100 ? 0 : 600);
                 $stats[$h] = $mapped;
             }
@@ -2084,10 +2084,10 @@ function ts_recent_block_stats(array $net, int $count = 12): array
  * goggles treemap). Each entry ['rate' => sat/vB float, 'vsize' => int]. From
  * getrawmempool(true), cached 5s, capped so downstream markup stays bounded.
  */
-function ts_mempool_txfees(array $net): array
+function lx_mempool_txfees(array $net): array
 {
     return cache_remember('memtxfees:' . $net['slug'], 5, function () use ($net) {
-        $verbose = ts_mempool_verbose($net);
+        $verbose = lx_mempool_verbose($net);
         if (!$verbose) {
             return [];
         }
@@ -2107,7 +2107,7 @@ function ts_mempool_txfees(array $net): array
 }
 
 /** Finalise one projected block: weighted-median rate + capped cells for the treemap. */
-function ts_proj_block_finish(int $vs, ?float $min, ?float $max, int $count, int $fee, array $cells, bool $partial): array
+function lx_proj_block_finish(int $vs, ?float $min, ?float $max, int $count, int $fee, array $cells, bool $partial): array
 {
     $half = $vs / 2; $c = 0;
     $med = $cells ? (float) $cells[count($cells) - 1]['rate'] : 0.0;
@@ -2118,7 +2118,7 @@ function ts_proj_block_finish(int $vs, ?float $min, ?float $max, int $count, int
     // Downsample into ~140 vsize-buckets (fee-ordered) so the goggles treemap
     // fills the whole column and the markup stays bounded even for a block packed
     // with thousands of txs. The merged cells' vsize still sums to $vs, so scaling
-    // by $vs in ts_goggles_block fills 0-100% and preserves the fee distribution.
+    // by $vs in lx_goggles_block fills 0-100% and preserves the fee distribution.
     if (count($cells) > 140 && $vs > 0) {
         $target = $vs / 140;
         $merged = [];
@@ -2149,10 +2149,10 @@ function ts_proj_block_finish(int $vs, ?float $min, ?float $max, int $count, int
  * feeRange}. We only track virtual size, so blockSize mirrors blockVSize.
  * feeRange is an ascending 7-point fee-rate percentile sweep of each block.
  */
-function ts_mempool_blocks_api(array $net): array
+function lx_mempool_blocks_api(array $net): array
 {
     $out = [];
-    foreach (ts_projected_blocks($net, 8) as $b) {
+    foreach (lx_projected_blocks($net, 8) as $b) {
         $vs    = (int) $b['vsize'];
         $cells = $b['cells'];                 // fee-ordered, highest rate first
         $range = [];
@@ -2189,13 +2189,13 @@ function ts_mempool_blocks_api(array $net): array
  * (tools/snapshot.php cron). Empty array when no snapshots exist yet. Not a
  * byte-exact mempool.space clone; keys are self-describing. Newest last.
  */
-function ts_statistics_api(array $net): array
+function lx_statistics_api(array $net): array
 {
-    if (!function_exists('ts_stats_series')) {
+    if (!function_exists('lx_stats_series')) {
         return [];
     }
     $out = [];
-    foreach (ts_stats_series($net, 48) as $r) {
+    foreach (lx_stats_series($net, 48) as $r) {
         $out[] = [
             'time'          => (int) $r['ts'],
             'tip_height'    => (int) $r['tip_height'],
@@ -2217,9 +2217,9 @@ function ts_statistics_api(array $net): array
  * recent window (mempool.space-ish shape). Any :period segment is accepted but
  * ignored; the window is our fixed recent span.
  */
-function ts_mining_pools_api(array $net, int $window = 50): array
+function lx_mining_pools_api(array $net, int $window = 50): array
 {
-    $d = ts_mining_distribution($net, $window);
+    $d = lx_mining_distribution($net, $window);
     $pools = [];
     foreach ($d['pools'] as $i => $p) {
         $pools[] = [
@@ -2236,14 +2236,14 @@ function ts_mining_pools_api(array $net, int $window = 50): array
  * /api/v1/mining/hashrate[/:period] - estimated hashrate + difficulty over a
  * recent sampled window (oldest first), plus the current values.
  */
-function ts_mining_hashrate_api(array $net, string $period = ''): array
+function lx_mining_hashrate_api(array $net, string $period = ''): array
 {
     // mempool.space /mining/hashrate/:timePeriod - window (in blocks) follows the period.
     static $spanMap = ['24h' => 576, '3d' => 1728, '1w' => 4032, '1m' => 17280, '3m' => 51840,
                        '6m' => 103680, '1y' => 210240, '2y' => 420480, '3y' => 630720, 'all' => 1000000];
     $span = $spanMap[$period] ?? 12000;
     $hr = [];
-    foreach (ts_difficulty_series($net, 45, $span) as $r) {
+    foreach (lx_difficulty_series($net, 45, $span) as $r) {
         $hr[] = [
             'timestamp'   => (int) $r['time'],
             'height'      => (int) $r['height'],
@@ -2265,9 +2265,9 @@ function ts_mining_hashrate_api(array $net, string $period = ''): array
  * + weighted-median + total vsize + tx count + total fee + per-tx cells (for the
  * goggles treemap). Up to $maxBlocks; the last may be a partial (not-yet-full) block.
  */
-function ts_projected_blocks(array $net, int $maxBlocks = 8): array
+function lx_projected_blocks(array $net, int $maxBlocks = 8): array
 {
-    $txs = ts_mempool_txfees($net);
+    $txs = lx_mempool_txfees($net);
     if (!$txs) {
         return [];
     }
@@ -2284,7 +2284,7 @@ function ts_projected_blocks(array $net, int $maxBlocks = 8): array
         if ($min === null || $rate < $min) { $min = $rate; }
         if ($max === null || $rate > $max) { $max = $rate; }
         if ($vs >= $CAP) {
-            $blocks[] = ts_proj_block_finish($vs, $min, $max, $count, $fee, $cells, false);
+            $blocks[] = lx_proj_block_finish($vs, $min, $max, $count, $fee, $cells, false);
             if (count($blocks) >= $maxBlocks) {
                 return $blocks;
             }
@@ -2292,7 +2292,7 @@ function ts_projected_blocks(array $net, int $maxBlocks = 8): array
         }
     }
     if ($vs > 0 && count($blocks) < $maxBlocks) {
-        $blocks[] = ts_proj_block_finish($vs, $min, $max, $count, $fee, $cells, true);
+        $blocks[] = lx_proj_block_finish($vs, $min, $max, $count, $fee, $cells, true);
     }
     return $blocks;
 }
@@ -2300,16 +2300,16 @@ function ts_projected_blocks(array $net, int $maxBlocks = 8): array
 /**
  * The transactions packed into projected block $index (0-based), fee-ordered
  * highest first, each ['txid','rate' (sat/vB),'vsize','fee' (sat)]. Uses the
- * exact ~1 vMB packing rule ts_projected_blocks() does, so block $index here is
+ * exact ~1 vMB packing rule lx_projected_blocks() does, so block $index here is
  * the same block shown there. Bounded to $limit rows for display. Cached 5s.
  */
-function ts_projected_block_txlist(array $net, int $index, int $limit = 60): array
+function lx_projected_block_txlist(array $net, int $index, int $limit = 60): array
 {
     if ($index < 0) {
         return [];
     }
     return cache_remember('projtxs:' . $net['slug'] . ':' . $index . ':' . $limit, 5, function () use ($net, $index, $limit) {
-        $verbose = ts_mempool_verbose($net);
+        $verbose = lx_mempool_verbose($net);
         if (!$verbose) {
             return [];
         }
@@ -2326,7 +2326,7 @@ function ts_projected_block_txlist(array $net, int $index, int $limit = 60): arr
             return $b['rate'] <=> $a['rate'];   // highest fee rate first
         });
         if (count($rows) > 4000) {
-            $rows = array_slice($rows, 0, 4000);   // match ts_mempool_txfees' cap so block boundaries agree
+            $rows = array_slice($rows, 0, 4000);   // match lx_mempool_txfees' cap so block boundaries agree
         }
         $CAP = 1000000;
         $acc = 0; $blk = 0; $out = [];
@@ -2337,7 +2337,7 @@ function ts_projected_block_txlist(array $net, int $index, int $limit = 60): arr
                 break;
             }
             $acc += $r['vsize'];
-            if ($acc >= $CAP) { $blk++; $acc = 0; }   // crossing tx counts in the current block, matching ts_projected_blocks
+            if ($acc >= $CAP) { $blk++; $acc = 0; }   // crossing tx counts in the current block, matching lx_projected_blocks
         }
         return $out;
     });
@@ -2348,10 +2348,10 @@ function ts_projected_block_txlist(array $net, int $index, int $limit = 60): arr
  * fee rate reach? Projected blocks are packed highest-fee-first, so the tx lands
  * in the first block whose fee floor it clears. Returns a short human label.
  */
-function ts_tx_eta(array $net, float $feeRate): string
+function lx_tx_eta(array $net, float $feeRate): string
 {
     $spacing = ($net['coin'] ?? '') === 'ltc' ? 150 : 600;
-    $proj = ts_projected_blocks($net, 8);
+    $proj = lx_projected_blocks($net, 8);
     if (!$proj) {
         return '~ next block · ~' . round($spacing / 60) . ' min';   // ~empty mempool
     }
@@ -2371,12 +2371,12 @@ function ts_tx_eta(array $net, float $feeRate): string
 /**
  * Explicit mempool position for an unconfirmed tx (mempool.space style): which
  * projected block it lands in, out of how many, and the higher-fee vsize packed
- * ahead of it. Shares the projection with ts_tx_eta. Returns null when the
+ * ahead of it. Shares the projection with lx_tx_eta. Returns null when the
  * mempool is empty or the tx is beyond the projected horizon.
  */
-function ts_mempool_position(array $net, float $feeRate): ?array
+function lx_mempool_position(array $net, float $feeRate): ?array
 {
-    $proj = ts_projected_blocks($net, 8);
+    $proj = lx_projected_blocks($net, 8);
     if (!$proj) {
         return null;
     }
@@ -2396,7 +2396,7 @@ function ts_mempool_position(array $net, float $feeRate): ?array
  * inputs, this tx was replaced (or conflicts); returns that txid, else null.
  * Soft-fails to null on nodes without the RPC (older litecoind).
  */
-function ts_tx_replacement(array $net, array $tx): ?string
+function lx_tx_replacement(array $net, array $tx): ?string
 {
     if (!empty($tx['status']['confirmed'])) {
         return null;
@@ -2414,7 +2414,7 @@ function ts_tx_replacement(array $net, array $tx): ?string
     // into a single gettxspendingprevout round-trip. Cached value is a txid or ''.
     $txid = $tx['txid'];
     $spender = cache_remember('rbf:' . $net['slug'] . ':' . $txid, 5, function () use ($net, $outpoints, $txid) {
-        $res = ts_rpc_soft($net, 'gettxspendingprevout', [$outpoints]);
+        $res = lx_rpc_soft($net, 'gettxspendingprevout', [$outpoints]);
         if (!is_array($res)) {
             return '';
         }
@@ -2434,11 +2434,11 @@ function ts_tx_replacement(array $net, array $tx): ?string
 
 /**
  * Forward RBF replacement chain for an unconfirmed tx: this tx -> its replacer
- * -> ... following ts_tx_replacement at each hop until a still-live or confirmed
+ * -> ... following lx_tx_replacement at each hop until a still-live or confirmed
  * tx (or the cap). Returns a list of ['txid','confirmed','feerate'] in order.
  * Empty for a tx that has not been replaced.
  */
-function ts_rbf_chain(array $net, array $tx, int $max = 6): array
+function lx_rbf_chain(array $net, array $tx, int $max = 6): array
 {
     if (!empty($tx['status']['confirmed'])) {
         return [];
@@ -2447,12 +2447,12 @@ function ts_rbf_chain(array $net, array $tx, int $max = 6): array
     $cur = $tx;
     $seen = [$tx['txid'] => true];
     for ($i = 0; $i < $max; $i++) {
-        $repl = ts_tx_replacement($net, $cur);
+        $repl = lx_tx_replacement($net, $cur);
         if ($repl === null || isset($seen[$repl])) {
             break;
         }
         $seen[$repl] = true;
-        $next = ts_find_tx($net, $repl);
+        $next = lx_find_tx($net, $repl);
         $vs = $next ? (int) ceil(($next['weight'] ?? 0) / 4) : 0;
         $chain[] = [
             'txid'      => $repl,
@@ -2468,9 +2468,9 @@ function ts_rbf_chain(array $net, array $tx, int $max = 6): array
 }
 
 /** One related-tx row (txid + fee rate) for the CPFP package display. */
-function ts_cpfp_relrow(array $net, string $id): array
+function lx_cpfp_relrow(array $net, string $id): array
 {
-    $t = ts_esplora_tx($net, $id);
+    $t = lx_esplora_tx($net, $id);
     $vs = $t ? (int) ceil(($t['weight'] ?? 0) / 4) : 0;
     return ['txid' => $id, 'feerate' => ($t && $vs > 0) ? ($t['fee'] ?? 0) / $vs : null];
 }
@@ -2481,9 +2481,9 @@ function ts_cpfp_relrow(array $net, string $id): array
  * rate, plus the total ancestor/descendant counts. Returns null when the tx is
  * a standalone package (or is confirmed / not in the mempool).
  */
-function ts_cpfp_package(array $net, string $txid): ?array
+function lx_cpfp_package(array $net, string $txid): ?array
 {
-    $e = ts_mempool_entry($net, $txid);
+    $e = lx_mempool_entry($net, $txid);
     if (!is_array($e)) {
         return null;
     }
@@ -2499,10 +2499,10 @@ function ts_cpfp_package(array $net, string $txid): ?array
         'spentby'     => [],
     ];
     foreach (array_slice($depends, 0, 12) as $id) {
-        $out['depends'][] = ts_cpfp_relrow($net, $id);
+        $out['depends'][] = lx_cpfp_relrow($net, $id);
     }
     foreach (array_slice($spentby, 0, 12) as $id) {
-        $out['spentby'][] = ts_cpfp_relrow($net, $id);
+        $out['spentby'][] = lx_cpfp_relrow($net, $id);
     }
     return $out;
 }
@@ -2514,11 +2514,11 @@ function ts_cpfp_package(array $net, string $txid): ?array
  * batch, one getblockheader batch). Cached ~10 min. Hashrate = difficulty *
  * 2^32 / target-spacing.
  */
-function ts_difficulty_series(array $net, int $points = 24, int $span = 12000): array
+function lx_difficulty_series(array $net, int $points = 24, int $span = 12000): array
 {
     $points = max(2, min(60, $points));
     return cache_remember('diffseries:' . $net['slug'] . ':' . $points . ':' . $span, 600, function () use ($net, $points, $span) {
-        $tip = ts_tip_height($net);
+        $tip = lx_tip_height($net);
         if ($tip < 1) {
             return [];
         }
@@ -2533,7 +2533,7 @@ function ts_difficulty_series(array $net, int $points = 24, int $span = 12000): 
         foreach ($heights as $hh) {
             $calls[] = ['getblockhash', [$hh]];
         }
-        $hashes = ts_rpc_batch($net, $calls);
+        $hashes = lx_rpc_batch($net, $calls);
 
         $hdrCalls = [];
         $idxMap   = [];
@@ -2543,7 +2543,7 @@ function ts_difficulty_series(array $net, int $points = 24, int $span = 12000): 
                 $idxMap[]   = $i;
             }
         }
-        $hdrs = ts_rpc_batch($net, $hdrCalls);
+        $hdrs = lx_rpc_batch($net, $hdrCalls);
 
         $spacing = $net['coin'] === 'ltc' ? 150 : 600;
         $out = [];
@@ -2567,35 +2567,35 @@ function ts_difficulty_series(array $net, int $points = 24, int $span = 12000): 
 // ---- extras (RBF/CPFP, merkleblock-proof, health) -------------------------
 
 /** getmempoolentry for an unconfirmed tx (RBF flag + ancestor/descendant), or null. */
-function ts_mempool_entry(array $net, string $txid): ?array
+function lx_mempool_entry(array $net, string $txid): ?array
 {
-    $e = ts_rpc_soft($net, 'getmempoolentry', [$txid]);
+    $e = lx_rpc_soft($net, 'getmempoolentry', [$txid]);
     return is_array($e) ? $e : null;
 }
 
 /** /tx/:txid/merkleblock-proof: bitcoind merkleblock hex via gettxoutproof. */
-function ts_merkleblock_proof(array $net, string $txid, ?string $blockhash = null): ?string
+function lx_merkleblock_proof(array $net, string $txid, ?string $blockhash = null): ?string
 {
     $params = $blockhash !== null ? [[$txid], $blockhash] : [[$txid]];
-    $r = ts_rpc_soft($net, 'gettxoutproof', $params);
+    $r = lx_rpc_soft($net, 'gettxoutproof', $params);
     return is_string($r) ? $r : null;
 }
 
 /** Health snapshot for /{coin}/{net}/api/health and the status page. */
-function ts_health(array $net): array
+function lx_health(array $net): array
 {
     $rpcOk = false;
     $height = null;
     $tipHash = null;
     $mempoolCount = null;
     try {
-        $height = (int) ts_rpc($net, 'getblockcount');
+        $height = (int) lx_rpc($net, 'getblockcount');
         $rpcOk = true;
-        $bh = ts_rpc_soft($net, 'getbestblockhash');
+        $bh = lx_rpc_soft($net, 'getbestblockhash');
         if (is_string($bh)) {
             $tipHash = $bh;
         }
-        $mi = ts_rpc_soft($net, 'getmempoolinfo');
+        $mi = lx_rpc_soft($net, 'getmempoolinfo');
         if (is_array($mi)) {
             $mempoolCount = (int) ($mi['size'] ?? 0);
         }
@@ -2604,7 +2604,7 @@ function ts_health(array $net): array
     }
     $electrumOk = false;
     try {
-        ts_electrum($net)->request('server.ping');
+        lx_electrum($net)->request('server.ping');
         $electrumOk = true;
     } catch (Throwable $e) {
         $electrumOk = false;
@@ -2622,33 +2622,33 @@ function ts_health(array $net): array
 // ---- dev tools (decode script / PSBT, encode OP_RETURN, verify message) ----
 
 /** decodescript: ASM, type, and derived p2sh/p2wsh addresses for a raw script hex. */
-function ts_decode_script(array $net, string $hex): ?array
+function lx_decode_script(array $net, string $hex): ?array
 {
     $hex = preg_replace('/\s+/', '', trim($hex));
     if ($hex === '' || !ctype_xdigit($hex) || strlen($hex) % 2 !== 0) {
         return null;
     }
-    $r = ts_rpc_soft($net, 'decodescript', [$hex]);
+    $r = lx_rpc_soft($net, 'decodescript', [$hex]);
     return is_array($r) ? $r : null;
 }
 
 /** decodepsbt + analyzepsbt for a base64 PSBT. */
-function ts_decode_psbt(array $net, string $psbt): ?array
+function lx_decode_psbt(array $net, string $psbt): ?array
 {
     $psbt = trim($psbt);
     if ($psbt === '') {
         return null;
     }
-    $decoded = ts_rpc_soft($net, 'decodepsbt', [$psbt]);
+    $decoded = lx_rpc_soft($net, 'decodepsbt', [$psbt]);
     if (!is_array($decoded)) {
         return null;
     }
-    $analysis = ts_rpc_soft($net, 'analyzepsbt', [$psbt]);
+    $analysis = lx_rpc_soft($net, 'analyzepsbt', [$psbt]);
     return ['decoded' => $decoded, 'analysis' => is_array($analysis) ? $analysis : null];
 }
 
-/** Build an OP_RETURN scriptPubKey (hex) from text or hex. Inverse of ts_parse_op_return. */
-function ts_encode_op_return(string $input, bool $isHex): ?array
+/** Build an OP_RETURN scriptPubKey (hex) from text or hex. Inverse of lx_parse_op_return. */
+function lx_encode_op_return(string $input, bool $isHex): ?array
 {
     $input = trim($input);
     if ($input === '') {
@@ -2683,8 +2683,8 @@ function ts_encode_op_return(string $input, bool $isHex): ?array
 }
 
 /** verifymessage (legacy p2pkh signing only). Returns true/false, or null on bad input. */
-function ts_verify_message(array $net, string $addr, string $sig, string $msg)
+function lx_verify_message(array $net, string $addr, string $sig, string $msg)
 {
-    $r = ts_rpc_soft($net, 'verifymessage', [$addr, $sig, $msg]);
+    $r = lx_rpc_soft($net, 'verifymessage', [$addr, $sig, $msg]);
     return is_bool($r) ? $r : null;
 }

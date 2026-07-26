@@ -4,12 +4,12 @@
  * privacy), the mempool footprint, and the UTXO-set summary. UTXO lanes only.
  * $net in scope. SPDX-License-Identifier: AGPL-3.0-or-later
  */
-$base  = ts_u($net);
-$node  = ts_node_report($net);
-$peers = ts_node_peers($net);
-$utxo  = ts_txoutset_info($net);
+$base  = lx_u($net);
+$node  = lx_node_report($net);
+$peers = lx_node_peers($net);
+$utxo  = lx_txoutset_info($net);
 
-ts_head($net, ['title' => 'Node - ' . $net['label'] . ' Explorer']);
+lx_head($net, ['title' => 'Node - ' . $net['label'] . ' Explorer']);
 
 // Uptime (seconds) -> "3d 4h" / "12m".
 $upStr = '-';
@@ -37,9 +37,9 @@ if ($node !== null && $node['uptime'] !== null && $node['uptime'] > 0) {
       <tr><th>Chain</th><td><?= h($node['chain'] !== '' ? $node['chain'] : '-') ?><?php if ($node['pruned']): ?> <span class="badge warn">pruned</span><?php endif; ?><?php if ($node['ibd']): ?> <span class="badge warn">syncing</span><?php endif; ?></td></tr>
       <tr><th>Blocks</th><td><a href="<?= h($base) ?>/block-height/<?= (int) $node['blocks'] ?>">#<?= commas($node['blocks']) ?></a><?php if ($node['headers'] > $node['blocks']): ?> <span class="muted">of <?= commas($node['headers']) ?> headers</span><?php endif; ?></td></tr>
       <tr><th>Verification</th><td><?= h(number_format(min(100, $node['progress'] * 100), 2)) ?>%</td></tr>
-      <tr><th>Difficulty</th><td class="mono"><?= h(ts_diff_str((float) $node['difficulty'])) ?></td></tr>
+      <tr><th>Difficulty</th><td class="mono"><?= h(lx_diff_str((float) $node['difficulty'])) ?></td></tr>
       <tr><th>Connections</th><td><?= commas($node['connections']) ?><?php if ($peers['ok'] && $peers['total']): ?> <span class="muted"><?= (int) $peers['outbound'] ?> out / <?= (int) $peers['inbound'] ?> in</span><?php endif; ?></td></tr>
-      <tr><th>Size on disk</th><td><?= h(ts_size_str((int) $node['size_on_disk'], 'B')) ?></td></tr>
+      <tr><th>Size on disk</th><td><?= h(lx_size_str((int) $node['size_on_disk'], 'B')) ?></td></tr>
       <tr><th>Uptime</th><td><?= h($upStr) ?></td></tr>
       <?php if ($node['warnings'] !== ''): ?><tr><th>Warnings</th><td><span class="badge warn"><?= h($node['warnings']) ?></span></td></tr><?php endif; ?>
     </table>
@@ -49,7 +49,7 @@ if ($node !== null && $node['uptime'] !== null && $node['uptime'] > 0) {
 </div></div>
 
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('activity') ?>Peers</span> <span class="sub"><?php if ($peers['ok']): ?><?= (int) $peers['total'] ?> connected &middot; <?= (int) $peers['outbound'] ?> out / <?= (int) $peers['inbound'] ?> in<?php else: ?>unavailable<?php endif; ?></span></div>
+  <div class="card-h"><span><?= lx_icon('activity') ?>Peers</span> <span class="sub"><?php if ($peers['ok']): ?><?= (int) $peers['total'] ?> connected &middot; <?= (int) $peers['outbound'] ?> out / <?= (int) $peers['inbound'] ?> in<?php else: ?>unavailable<?php endif; ?></span></div>
   <?php if ($peers['ok'] && $peers['total']): ?>
   <div class="card-b nopad table-wrap">
     <table>
@@ -68,20 +68,20 @@ if ($node !== null && $node['uptime'] !== null && $node['uptime'] > 0) {
       </tbody>
     </table>
   </div>
-  <div class="card-b"><p class="muted sub"><?= ts_icon('lock') ?> Peer addresses are masked, so the explorer never publishes its node&rsquo;s exact peer IPs.</p></div>
+  <div class="card-b"><p class="muted sub"><?= lx_icon('lock') ?> Peer addresses are masked, so the explorer never publishes its node&rsquo;s exact peer IPs.</p></div>
   <?php else: ?>
-  <div class="card-b"><div class="empty"><?= ts_icon('activity') ?><span><?= $peers['ok'] ? 'No peers connected.' : 'Peer list is unavailable while the node is unreachable.' ?></span></div></div>
+  <div class="card-b"><div class="empty"><?= lx_icon('activity') ?><span><?= $peers['ok'] ? 'No peers connected.' : 'Peer list is unavailable while the node is unreachable.' ?></span></div></div>
   <?php endif; ?>
 </div>
 
 <?php if ($node !== null): ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('clock') ?>Mempool</span> <span class="sub">this node&rsquo;s view</span></div>
+  <div class="card-h"><span><?= lx_icon('clock') ?>Mempool</span> <span class="sub">this node&rsquo;s view</span></div>
   <div class="card-b nopad">
     <table class="kv">
       <tr><th>Transactions</th><td><?= commas($node['mempool_txs']) ?></td></tr>
-      <tr><th>Virtual size</th><td><?= h(ts_size_str((int) $node['mempool_bytes'], 'vB')) ?></td></tr>
-      <tr><th>Memory usage</th><td><?= h(ts_size_str((int) $node['mempool_usage'], 'B')) ?><?php if ($node['mempool_max']): ?> <span class="muted">of <?= h(ts_size_str((int) $node['mempool_max'], 'B')) ?></span><?php endif; ?></td></tr>
+      <tr><th>Virtual size</th><td><?= h(lx_size_str((int) $node['mempool_bytes'], 'vB')) ?></td></tr>
+      <tr><th>Memory usage</th><td><?= h(lx_size_str((int) $node['mempool_usage'], 'B')) ?><?php if ($node['mempool_max']): ?> <span class="muted">of <?= h(lx_size_str((int) $node['mempool_max'], 'B')) ?></span><?php endif; ?></td></tr>
       <tr><th>Min relay fee</th><td class="mono"><?= h(number_format($node['relayfee'] * 100000, 2)) ?> sat/vB</td></tr>
     </table>
   </div>
@@ -89,7 +89,7 @@ if ($node !== null && $node['uptime'] !== null && $node['uptime'] > 0) {
 <?php endif; ?>
 
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('database') ?>UTXO set</span> <span class="sub">from the chainstate</span></div>
+  <div class="card-h"><span><?= lx_icon('database') ?>UTXO set</span> <span class="sub">from the chainstate</span></div>
   <?php if ($utxo !== null): ?>
   <div class="card-b nopad">
     <table class="kv">
@@ -97,11 +97,11 @@ if ($node !== null && $node['uptime'] !== null && $node['uptime'] > 0) {
       <tr><th>Unspent outputs</th><td><?= commas($utxo['txouts']) ?></td></tr>
       <tr><th>Transactions with UTXOs</th><td><?= commas($utxo['transactions']) ?></td></tr>
       <tr><th>Total value</th><td class="mono"><?= h(number_format($utxo['total_amount'], 2)) ?> <?= h($net['unit']) ?></td></tr>
-      <tr><th>Chainstate size</th><td><?= h(ts_size_str((int) $utxo['disk_size'], 'B')) ?></td></tr>
+      <tr><th>Chainstate size</th><td><?= h(lx_size_str((int) $utxo['disk_size'], 'B')) ?></td></tr>
     </table>
   </div>
   <?php else: ?>
-  <div class="card-b"><div class="empty"><?= ts_icon('database') ?><span>The UTXO-set summary is not available right now.</span></div></div>
+  <div class="card-b"><div class="empty"><?= lx_icon('database') ?><span>The UTXO-set summary is not available right now.</span></div></div>
   <?php endif; ?>
 </div>
-<?php ts_foot($net); ?>
+<?php lx_foot($net); ?>

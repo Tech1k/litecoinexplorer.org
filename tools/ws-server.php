@@ -28,12 +28,12 @@ require dirname(__DIR__) . '/lib/ws.php';
 error_reporting(E_ALL & ~E_DEPRECATED);
 
 $slug = $argv[1] ?? 'ltc-mainnet';
-$net  = ts_net($slug);
+$net  = lx_net($slug);
 if (!$net) {
     fwrite(STDERR, "unknown or disabled network: $slug\n");
     exit(1);
 }
-$port = (int) ($argv[2] ?? (ts_config()['ws_port'] ?? 8482));
+$port = (int) ($argv[2] ?? (lx_config()['ws_port'] ?? 8482));
 $host = '127.0.0.1';
 
 $server = @stream_socket_server("tcp://$host:$port", $errno, $errstr);
@@ -175,11 +175,11 @@ function ws_on_message(array &$c, string $text, array $net): void
             // Cap the list: only a handful of stream names are meaningful, so bound it
             // to stop a client pinning per-tick in_array scans / holding a huge array.
             $c['wants'] = array_slice(array_values(array_filter($msg['data'], 'is_string')), 0, 24);
-            ws_send($c['sock'], ts_ws_init($net, $c['wants']));
-            if (in_array('live-2h-chart', $c['wants'], true)) { ws_send($c['sock'], ['live-2h-chart' => ts_ws_2h_chart($net)]); }
+            ws_send($c['sock'], lx_ws_init($net, $c['wants']));
+            if (in_array('live-2h-chart', $c['wants'], true)) { ws_send($c['sock'], ['live-2h-chart' => lx_ws_2h_chart($net)]); }
         } elseif ($msg['action'] === 'init') {
             if (!$c['wants']) { $c['wants'] = ['blocks', 'stats', 'mempool-blocks']; }   // persist so ticks keep pushing
-            ws_send($c['sock'], ts_ws_init($net, $c['wants']));
+            ws_send($c['sock'], lx_ws_init($net, $c['wants']));
         }
     }
     if (array_key_exists('track-txs', $msg)) {                 // batch tx tracking (plural)
@@ -194,7 +194,7 @@ function ws_on_message(array &$c, string $text, array $net): void
         $addrs = [];
         foreach ((is_array($msg['track-addresses']) ? $msg['track-addresses'] : []) as $a) {
             if (count($addrs) >= 20) { break; }
-            if (is_string($a) && ts_address_valid($net, $a)) { $addrs[$a] = true; }
+            if (is_string($a) && lx_address_valid($net, $a)) { $addrs[$a] = true; }
         }
         $c['trackAddrs'] = array_keys($addrs);
         $c['seenAddrs'] = [];
@@ -213,7 +213,7 @@ function ws_on_message(array &$c, string $text, array $net): void
         // Validate before accepting so a client can't pin the daemon on a per-tick
         // history walk for a garbage/non-indexable string.
         $v = $msg['track-address'];
-        $c['trackAddr'] = (is_string($v) && $v !== 'stop' && $v !== '' && ts_address_valid($net, $v)) ? $v : null;
+        $c['trackAddr'] = (is_string($v) && $v !== 'stop' && $v !== '' && lx_address_valid($net, $v)) ? $v : null;
         $c['seenAddr'] = [];
     }
     if (array_key_exists('track-rbf', $msg)) {
@@ -304,8 +304,8 @@ while (true) {
     }
     $lastChain = $now;
     try {
-        $tip = ts_tip_height($net);
-        $mem = ts_esplora_mempool($net);
+        $tip = lx_tip_height($net);
+        $mem = lx_esplora_mempool($net);
         $t   = time();
         $mvsize = (int) ($mem['vsize'] ?? 0);
         $vbps = 0.0;
@@ -321,16 +321,16 @@ while (true) {
 
         $blockExt = null; $da = null;
         if ($newBlock || $firstTip) {
-            $h = ts_block_hash_at($net, $tip);
-            if ($h) { $blockExt = ts_ws_block_extended($net, $h); }
-            $da = ts_difficulty_adjustment($net);
+            $h = lx_block_hash_at($net, $tip);
+            if ($h) { $blockExt = lx_ws_block_extended($net, $h); }
+            $da = lx_difficulty_adjustment($net);
         }
 
         // RBF detection pass; collect events newer than what we last pushed.
         $newRbf = [];
-        if (function_exists('ts_rbf_tick')) {
-            ts_rbf_tick($net, 120);
-            foreach (ts_replacements_api($net, 25) as $node) {
+        if (function_exists('lx_rbf_tick')) {
+            lx_rbf_tick($net, 120);
+            foreach (lx_replacements_api($net, 25) as $node) {
                 if ((int) ($node['time'] ?? 0) > $last['rbf_ts']) { $newRbf[] = $node; }
             }
             if ($newRbf) { $last['rbf_ts'] = (int) ($newRbf[0]['time'] ?? $last['rbf_ts']); }
@@ -338,16 +338,16 @@ while (true) {
 
         $conv = null;
         if ($now - $lastConv >= $CONV_SEC) {
-            $conv = ts_ws_conversions($net);
+            $conv = lx_ws_conversions($net);
             $lastConv = $now;
         }
 
         // Shared state computed ONCE per tick (not per client) - one set of RPC calls
         // regardless of how many clients are subscribed.
-        $shInfo = ts_ws_mempoolinfo($net);
-        $shFees = null; try { $shFees = ts_fees_recommended($net); } catch (Throwable $e) {}
-        $shTxs  = ts_ws_recent_txs($net);
-        $shMB   = ts_mempool_blocks_api($net);
+        $shInfo = lx_ws_mempoolinfo($net);
+        $shFees = null; try { $shFees = lx_fees_recommended($net); } catch (Throwable $e) {}
+        $shTxs  = lx_ws_recent_txs($net);
+        $shMB   = lx_mempool_blocks_api($net);
         $vbpsInt = (int) round($vbps);
 
         // Mempool-txid delta (shared): compute the current set once + the added/removed vs the
@@ -357,7 +357,7 @@ while (true) {
             if ($cc['trackMpTxids']) { $anyMp = true; }
             if (in_array('live-2h-chart', $cc['wants'], true)) { $any2h = true; }
         }
-        $mpTxids = $anyMp ? ts_ws_mempool_txids($net) : null;
+        $mpTxids = $anyMp ? lx_ws_mempool_txids($net) : null;
         $mpAdded = []; $mpRemoved = [];
         if ($mpTxids !== null && $mpPrev !== null) {
             $mpAdded   = array_keys(array_diff_key($mpTxids, $mpPrev));
@@ -366,7 +366,7 @@ while (true) {
         // Refresh the 2h chart on its OWN cadence, not tied to price availability (else it
         // stops updating whenever fiat is unavailable).
         $sh2h = null;
-        if ($any2h && $now - $last2h >= $TWOH_SEC) { $sh2h = ts_ws_2h_chart($net); $last2h = $now; }
+        if ($any2h && $now - $last2h >= $TWOH_SEC) { $sh2h = lx_ws_2h_chart($net); $last2h = $now; }
 
         foreach ($clients as $id => &$c) {
             if (!$c['hs']) { continue; }
@@ -387,14 +387,14 @@ while (true) {
                 if ($conv) { $push['conversions'] = $conv; }
                 if ($c['trackRbf'] && $newRbf) { $push['rbfLatest'] = $newRbf; }
                 if ($c['trackTx'] && empty($c['notified'][$c['trackTx']])) {   // stop looking up once confirmed
-                    $tx = ts_find_tx($net, $c['trackTx']);
+                    $tx = lx_find_tx($net, $c['trackTx']);
                     if (is_array($tx) && !empty($tx['status']['confirmed'])) {
                         $push['txConfirmed'] = $c['trackTx'];
                         $c['notified'][$c['trackTx']] = true;
                     }
                 }
                 if ($c['trackAddr']) {
-                    $txs = ts_address_txs($net, $c['trackAddr'], 'all');
+                    $txs = lx_address_txs($net, $c['trackAddr'], 'all');
                     $memNew = []; $blkNew = [];
                     foreach ((is_array($txs) ? $txs : []) as $atx) {
                         $tid = $atx['txid'] ?? '';
@@ -410,7 +410,7 @@ while (true) {
                     $confd = [];
                     foreach ($c['trackTxs'] as $tid) {
                         if (!empty($c['notified'][$tid])) { continue; }
-                        $tx = ts_find_tx($net, $tid);
+                        $tx = lx_find_tx($net, $tid);
                         if (is_array($tx) && !empty($tx['status']['confirmed'])) { $confd[] = $tid; $c['notified'][$tid] = true; }
                     }
                     if ($confd) { $push['txsConfirmed'] = $confd; }
@@ -418,7 +418,7 @@ while (true) {
                 if ($c['trackAddrs']) {                            // batch address tracking -> {multi-address-transactions}
                     $mAll = []; $bAll = [];
                     foreach ($c['trackAddrs'] as $addr) {
-                        $atxs = ts_address_txs($net, $addr, 'all');
+                        $atxs = lx_address_txs($net, $addr, 'all');
                         foreach ((is_array($atxs) ? $atxs : []) as $atx) {
                             $tid = $atx['txid'] ?? ''; $k = $addr . ':' . $tid;
                             if ($tid === '' || isset($c['seenAddrs'][$k])) { continue; }

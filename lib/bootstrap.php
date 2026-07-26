@@ -7,8 +7,8 @@
  * Litecoin Explorer © 2026 Tech1k
  */
 
-if (!defined('TS_ROOT')) {
-    define('TS_ROOT', dirname(__DIR__));
+if (!defined('LX_ROOT')) {
+    define('LX_ROOT', dirname(__DIR__));
 }
 
 // Satoshi amounts (max supply 84,000,000 LTC = 8.4e15 sat) exceed a 32-bit int, where
@@ -21,8 +21,8 @@ if (PHP_INT_SIZE < 8) {
 
 // ---- config ---------------------------------------------------------------
 
-$ts_config_file = TS_ROOT . '/config.php';
-if (!is_file($ts_config_file)) {
+$lx_config_file = LX_ROOT . '/config.php';
+if (!is_file($lx_config_file)) {
     // No config yet: fail loudly but safely (no secrets to leak).
     http_response_code(503);
     header('Retry-After: 120');
@@ -31,14 +31,14 @@ if (!is_file($ts_config_file)) {
     exit;
 }
 
-$GLOBALS['TS_CONFIG'] = require $ts_config_file;
+$GLOBALS['LX_CONFIG'] = require $lx_config_file;
 
-function ts_config(): array
+function lx_config(): array
 {
-    return $GLOBALS['TS_CONFIG'];
+    return $GLOBALS['LX_CONFIG'];
 }
 
-define('TS_DEBUG', !empty($GLOBALS['TS_CONFIG']['debug']));
+define('LX_DEBUG', !empty($GLOBALS['LX_CONFIG']['debug']));
 
 // Defense-in-depth: emit the security headers from PHP too. .htaccess sets these
 // via mod_headers (whose `set` overrides these identically, so no duplicate), but
@@ -54,7 +54,7 @@ if (PHP_SAPI !== 'cli' && !headers_sent()) {
 
 // ---- error handling -------------------------------------------------------
 
-if (TS_DEBUG) {
+if (LX_DEBUG) {
     ini_set('display_errors', '1');
     error_reporting(E_ALL);
 } else {
@@ -62,16 +62,16 @@ if (TS_DEBUG) {
     error_reporting(0);
     // Any uncaught exception (RPC down, electrum unreachable, etc.) becomes a
     // clean 503 rather than a blank 500. API paths get a text body; the front
-    // controller decides HTML vs text via TS_WANTS_JSON when it is set.
+    // controller decides HTML vs text via LX_WANTS_JSON when it is set.
     set_exception_handler(function (Throwable $e) {
         if (!headers_sent()) {
             http_response_code(503);
             header('Retry-After: 30');
         }
-        if (defined('TS_WANTS_JSON') && TS_WANTS_JSON) {
+        if (defined('LX_WANTS_JSON') && LX_WANTS_JSON) {
             if (!headers_sent()) {
                 header('Content-Type: text/plain; charset=utf-8');
-                ts_cors();
+                lx_cors();
             }
             echo "Backend temporarily unavailable.";
         } else {

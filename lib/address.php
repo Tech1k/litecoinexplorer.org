@@ -13,14 +13,14 @@
 
 // ---- base58check ----------------------------------------------------------
 
-const TS_B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const LX_B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 /** Decode base58 to a binary string, or null on invalid character. */
-function ts_base58_decode(string $s): ?string
+function lx_base58_decode(string $s): ?string
 {
     $map = [];
-    for ($i = 0, $n = strlen(TS_B58_ALPHABET); $i < $n; $i++) {
-        $map[TS_B58_ALPHABET[$i]] = $i;
+    for ($i = 0, $n = strlen(LX_B58_ALPHABET); $i < $n; $i++) {
+        $map[LX_B58_ALPHABET[$i]] = $i;
     }
     $bytes = [0];
     $len = strlen($s);
@@ -52,9 +52,9 @@ function ts_base58_decode(string $s): ?string
 }
 
 /** Decode base58check; returns [versionByte, payloadBinary] or null. */
-function ts_base58check_decode(string $s): ?array
+function lx_base58check_decode(string $s): ?array
 {
-    $raw = ts_base58_decode($s);
+    $raw = lx_base58_decode($s);
     if ($raw === null || strlen($raw) < 5) {
         return null;
     }
@@ -69,11 +69,11 @@ function ts_base58check_decode(string $s): ?array
 
 // ---- bech32 / bech32m -----------------------------------------------------
 
-const TS_BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
-const TS_BECH32_CONST  = 1;
-const TS_BECH32M_CONST = 0x2bc830a3;
+const LX_BECH32_CHARSET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const LX_BECH32_CONST  = 1;
+const LX_BECH32M_CONST = 0x2bc830a3;
 
-function ts_bech32_polymod(array $values): int
+function lx_bech32_polymod(array $values): int
 {
     $gen = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
     $chk = 1;
@@ -89,7 +89,7 @@ function ts_bech32_polymod(array $values): int
     return $chk;
 }
 
-function ts_bech32_hrp_expand(string $hrp): array
+function lx_bech32_hrp_expand(string $hrp): array
 {
     $out = [];
     $len = strlen($hrp);
@@ -104,7 +104,7 @@ function ts_bech32_hrp_expand(string $hrp): array
 }
 
 /** Decode a bech32 string; returns [hrp, data5bit[], spec] or null. */
-function ts_bech32_decode(string $s): ?array
+function lx_bech32_decode(string $s): ?array
 {
     $slen = strlen($s);
     if ($slen < 8 || $slen > 110) {
@@ -125,17 +125,17 @@ function ts_bech32_decode(string $s): ?array
     $data = [];
     $len = strlen($dataPart);
     for ($i = 0; $i < $len; $i++) {
-        $idx = strpos(TS_BECH32_CHARSET, $dataPart[$i]);
+        $idx = strpos(LX_BECH32_CHARSET, $dataPart[$i]);
         if ($idx === false) {
             return null;
         }
         $data[] = $idx;
     }
-    $values = array_merge(ts_bech32_hrp_expand($hrp), $data);
-    $chk = ts_bech32_polymod($values);
-    if ($chk === TS_BECH32_CONST) {
+    $values = array_merge(lx_bech32_hrp_expand($hrp), $data);
+    $chk = lx_bech32_polymod($values);
+    if ($chk === LX_BECH32_CONST) {
         $spec = 'bech32';
-    } elseif ($chk === TS_BECH32M_CONST) {
+    } elseif ($chk === LX_BECH32M_CONST) {
         $spec = 'bech32m';
     } else {
         return null;
@@ -145,7 +145,7 @@ function ts_bech32_decode(string $s): ?array
 }
 
 /** Convert between bit groups (e.g. 5->8). Returns array or null. */
-function ts_convertbits(array $data, int $from, int $to, bool $pad): ?array
+function lx_convertbits(array $data, int $from, int $to, bool $pad): ?array
 {
     $acc = 0;
     $bits = 0;
@@ -176,9 +176,9 @@ function ts_convertbits(array $data, int $from, int $to, bool $pad): ?array
  * Decode a segwit address for $hrp. Returns [version, programBinary] or null.
  * Enforces the bech32 (v0) vs bech32m (v1+) split and length rules.
  */
-function ts_segwit_decode(string $hrp, string $addr): ?array
+function lx_segwit_decode(string $hrp, string $addr): ?array
 {
-    $dec = ts_bech32_decode($addr);
+    $dec = lx_bech32_decode($addr);
     if ($dec === null) {
         return null;
     }
@@ -190,7 +190,7 @@ function ts_segwit_decode(string $hrp, string $addr): ?array
     if ($version > 16) {
         return null;
     }
-    $prog = ts_convertbits(array_slice($data, 1), 5, 8, false);
+    $prog = lx_convertbits(array_slice($data, 1), 5, 8, false);
     if ($prog === null || count($prog) < 2 || count($prog) > 40) {
         return null;
     }
@@ -216,7 +216,7 @@ function ts_segwit_decode(string $hrp, string $addr): ?array
  * Build the scriptPubKey (hex) for an address on $net, or null if it isn't a
  * valid address for this network.
  */
-function ts_address_to_scriptpubkey(array $net, string $address): ?string
+function lx_address_to_scriptpubkey(array $net, string $address): ?string
 {
     $address = trim($address);
     if ($address === '') {
@@ -230,7 +230,7 @@ function ts_address_to_scriptpubkey(array $net, string $address): ?string
 
     // Segwit / bech32(m)
     if (!empty($net['bech32'])) {
-        $seg = ts_segwit_decode($net['bech32'], $address);
+        $seg = lx_segwit_decode($net['bech32'], $address);
         if ($seg !== null) {
             [$ver, $prog] = $seg;
             $op = $ver === 0 ? 0x00 : (0x50 + $ver);
@@ -239,7 +239,7 @@ function ts_address_to_scriptpubkey(array $net, string $address): ?string
     }
 
     // base58check (p2pkh / p2sh)
-    $b58 = ts_base58check_decode($address);
+    $b58 = lx_base58check_decode($address);
     if ($b58 !== null) {
         [$ver, $payload] = $b58;
         if (strlen($payload) !== 20) {
@@ -258,10 +258,10 @@ function ts_address_to_scriptpubkey(array $net, string $address): ?string
 }
 
 /** Classify an address for display. */
-function ts_address_type(array $net, string $address): string
+function lx_address_type(array $net, string $address): string
 {
     if (!empty($net['bech32'])) {
-        $seg = ts_segwit_decode($net['bech32'], $address);
+        $seg = lx_segwit_decode($net['bech32'], $address);
         if ($seg !== null) {
             [$ver, $prog] = $seg;
             if ($ver === 0) {
@@ -281,7 +281,7 @@ function ts_address_type(array $net, string $address): string
             return 'mweb';
         }
     }
-    $b58 = ts_base58check_decode($address);
+    $b58 = lx_base58check_decode($address);
     if ($b58 !== null) {
         [$ver] = $b58;
         if ($ver === ($net['p2pkh'] ?? -1)) {
@@ -295,7 +295,7 @@ function ts_address_type(array $net, string $address): string
 }
 
 /** True if the address is valid (and indexable) for this network. */
-function ts_address_valid(array $net, string $address): bool
+function lx_address_valid(array $net, string $address): bool
 {
-    return ts_address_to_scriptpubkey($net, $address) !== null;
+    return lx_address_to_scriptpubkey($net, $address) !== null;
 }

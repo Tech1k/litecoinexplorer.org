@@ -4,16 +4,16 @@
  * litecoind RPC (no analytics DB). $net in scope.
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
-// Fetch node/index/overlay data BEFORE ts_head so a litecoind outage throws into a
-// clean 503 - ts_head flushes the page head, after which set_exception_handler can no
-// longer set the status (every other view fetches before ts_head for this reason).
-$mwebOn = ts_mweb_enabled($net);
+// Fetch node/index/overlay data BEFORE lx_head so a litecoind outage throws into a
+// clean 503 - lx_head flushes the page head, after which set_exception_handler can no
+// longer set the status (every other view fetches before lx_head for this reason).
+$mwebOn = lx_mweb_enabled($net);
 if ($mwebOn) {
-    $base   = ts_u($net);
-    $idx    = ts_mweb_index_ready($net);
-    $st     = ts_mweb_active($net);
-    $act    = ts_mweb_activation($net);
-    $recent = ts_mweb_recent($net);
+    $base   = lx_u($net);
+    $idx    = lx_mweb_index_ready($net);
+    $st     = lx_mweb_active($net);
+    $act    = lx_mweb_activation($net);
+    $recent = lx_mweb_recent($net);
     // Newest two blocks that carry supply give the absolute supply + last-block delta.
     $supply = null; $supplyPrev = null;
     foreach ($recent as $b) {
@@ -24,16 +24,16 @@ if ($mwebOn) {
     $supplyDelta = ($supply !== null && $supplyPrev !== null) ? $supply - $supplyPrev : null;
     // Cumulative kernel / output counts from the MWEB header (best-effort; null
     // when the node build doesn't expose the getblock-2 .mweb object).
-    $kern = ts_mweb_kernels($net);
-    $tot  = $idx ? ts_mweb_peg_totals($net) : null;   // all-time peg economics (index only)
+    $kern = lx_mweb_kernels($net);
+    $tot  = $idx ? lx_mweb_peg_totals($net) : null;   // all-time peg economics (index only)
     // MWEBscan analysis overlay (best-effort; dormant/unreachable -> boundary-only).
-    $mwOn      = ts_mwebscan_enabled($net);
-    $mwStats   = $mwOn ? ts_mwebscan_api($net, 'stats', [], 120) : null;
-    $mwLinks   = $mwOn ? ts_mwebscan_api($net, 'links', ['limit' => '8', 'min_confidence' => '0.7'], 120) : null;
+    $mwOn      = lx_mwebscan_enabled($net);
+    $mwStats   = $mwOn ? lx_mwebscan_api($net, 'stats', [], 120) : null;
+    $mwLinks   = $mwOn ? lx_mwebscan_api($net, 'links', ['limit' => '8', 'min_confidence' => '0.7'], 120) : null;
     $mwPrivAmt = (isset($_GET['privacy_amount']) && is_numeric($_GET['privacy_amount']) && (float) $_GET['privacy_amount'] > 0) ? (string) (float) $_GET['privacy_amount'] : '';
-    $mwPriv    = ($mwOn && $mwPrivAmt !== '') ? ts_mwebscan_api($net, 'privacy', ['amount' => $mwPrivAmt], 300) : null;
+    $mwPriv    = ($mwOn && $mwPrivAmt !== '') ? lx_mwebscan_api($net, 'privacy', ['amount' => $mwPrivAmt], 300) : null;
 }
-ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
+lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 ?>
 <h1>MWEB</h1>
 <?php if (!$mwebOn): ?>
@@ -48,29 +48,29 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 <?php endif; ?>
 
 <div class="card brand-top" style="--brand:#6c5ce7">
-  <div class="card-h"><span><?= ts_icon('mweb') ?>MWEB shielded pool</span> <span class="hero-eyebrow"><span class="pulse-dot<?= $st['active'] ? '' : ' off' ?>"></span><?= $st['active'] ? 'active' : 'inactive' ?></span></div>
+  <div class="card-h"><span><?= lx_icon('mweb') ?>MWEB shielded pool</span> <span class="hero-eyebrow"><span class="pulse-dot<?= $st['active'] ? '' : ' off' ?>"></span><?= $st['active'] ? 'active' : 'inactive' ?></span></div>
   <div class="card-b">
     <div class="stat-grid">
       <?php if ($supply !== null): ?>
-      <div class="stat"><div class="muted sub"><?= ts_icon('lock') ?>Shielded supply</div><div class="big-num sm"><?= h(ts_coin_compact((float) $supply)) ?> <span class="muted" style="font-size:.6em"><?= h($net['unit']) ?></span></div><div class="muted sub"><?php if ($supplyDelta !== null && $supplyDelta !== 0): ?><span class="<?= $supplyDelta > 0 ? 'pos' : 'neg' ?>"><?= $supplyDelta > 0 ? '+' : '&minus;' ?><?= h(ts_coin(abs($supplyDelta))) ?></span> last block<?php else: ?>confidential in MWEB<?php endif; ?></div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('lock') ?>Shielded supply</div><div class="big-num sm"><?= h(lx_coin_compact((float) $supply)) ?> <span class="muted" style="font-size:.6em"><?= h($net['unit']) ?></span></div><div class="muted sub"><?php if ($supplyDelta !== null && $supplyDelta !== 0): ?><span class="<?= $supplyDelta > 0 ? 'pos' : 'neg' ?>"><?= $supplyDelta > 0 ? '+' : '&minus;' ?><?= h(lx_coin(abs($supplyDelta))) ?></span> last block<?php else: ?>confidential in MWEB<?php endif; ?></div></div>
       <?php endif; ?>
       <?php if ($tot): $netShield = $tot['pegin_total_sat'] - $tot['pegout_total_sat']; ?>
-      <div class="stat"><div class="muted sub"><?= ts_icon('repeat') ?>Net shielded</div><div class="big-num sm <?= $netShield >= 0 ? 'pos' : 'neg' ?>"><?= ($netShield < 0 ? '&minus;' : '') . h(ts_coin_compact((float) abs($netShield))) ?></div><div class="muted sub">pegged in &minus; out</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('log-in') ?>Total pegged in</div><div class="big-num sm"><?= h(ts_coin_compact((float) $tot['pegin_total_sat'])) ?></div><div class="muted sub"><?= commas($tot['pegin_count']) ?> peg-ins</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('log-out') ?>Total pegged out</div><div class="big-num sm"><?= h(ts_coin_compact((float) $tot['pegout_total_sat'])) ?></div><div class="muted sub"><?= commas($tot['pegout_count']) ?> peg-outs</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('repeat') ?>Net shielded</div><div class="big-num sm <?= $netShield >= 0 ? 'pos' : 'neg' ?>"><?= ($netShield < 0 ? '&minus;' : '') . h(lx_coin_compact((float) abs($netShield))) ?></div><div class="muted sub">pegged in &minus; out</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-in') ?>Total pegged in</div><div class="big-num sm"><?= h(lx_coin_compact((float) $tot['pegin_total_sat'])) ?></div><div class="muted sub"><?= commas($tot['pegin_count']) ?> peg-ins</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-out') ?>Total pegged out</div><div class="big-num sm"><?= h(lx_coin_compact((float) $tot['pegout_total_sat'])) ?></div><div class="muted sub"><?= commas($tot['pegout_count']) ?> peg-outs</div></div>
       <?php endif; ?>
       <?php if ($kern !== null && $kern['outputs'] !== null): ?>
-      <div class="stat"><div class="muted sub"><?= ts_icon('layers') ?>Output set</div><div class="big-num sm"><?= h(ts_num_compact((float) $kern['outputs'])) ?></div><div class="muted sub">confidential outputs</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('layers') ?>Output set</div><div class="big-num sm"><?= h(lx_num_compact((float) $kern['outputs'])) ?></div><div class="muted sub">confidential outputs</div></div>
       <?php endif; ?>
       <?php if ($kern !== null && $kern['kernels'] > 0): ?>
-      <div class="stat"><div class="muted sub"><?= ts_icon('box') ?>Kernels</div><div class="big-num sm"><?= commas($kern['kernels']) ?></div><div class="muted sub">in the latest block</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('box') ?>Kernels</div><div class="big-num sm"><?= commas($kern['kernels']) ?></div><div class="muted sub">in the latest block</div></div>
       <?php endif; ?>
-      <div class="stat"><div class="muted sub"><?= ts_icon('activity') ?>Chain tip</div><div class="big-num sm"><a href="<?= h($base) ?>/block-height/<?= (int) $st['height'] ?>">#<?= commas($st['height']) ?></a></div><div class="muted sub">MWEB since <?= commas($act) ?></div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('activity') ?>Chain tip</div><div class="big-num sm"><a href="<?= h($base) ?>/block-height/<?= (int) $st['height'] ?>">#<?= commas($st['height']) ?></a></div><div class="muted sub">MWEB since <?= commas($act) ?></div></div>
     </div>
     <?php if (!$idx): ?>
-    <p class="pnote"><?= ts_icon('info') ?><span>The supply chart, all-time peg economics and peg history come from the local peg index, which is <b>not enabled on this deployment</b>. Turn on <code>mweb.index</code> in <code>config.php</code> (seed once with <code>tools/mweb-seed.php</code>, then keep it fresh with <code>tools/mweb-index.php</code>) to fill them in.</span></p>
+    <p class="pnote"><?= lx_icon('info') ?><span>The supply chart, all-time peg economics and peg history come from the local peg index, which is <b>not enabled on this deployment</b>. Turn on <code>mweb.index</code> in <code>config.php</code> (seed once with <code>tools/mweb-seed.php</code>, then keep it fresh with <code>tools/mweb-index.php</code>) to fill them in.</span></p>
     <?php else: ?>
-    <p class="pnote"><?= ts_icon('eye-off') ?><span>MWEB amounts are confidential; only peg-ins (public &rarr; MWEB) and peg-outs (MWEB &rarr; public, carried by each block's HogEx) have visible amounts on the canonical chain. The shielded supply is the anonymity set every confidential output blends into.</span></p>
+    <p class="pnote"><?= lx_icon('eye-off') ?><span>MWEB amounts are confidential; only peg-ins (public &rarr; MWEB) and peg-outs (MWEB &rarr; public, carried by each block's HogEx) have visible amounts on the canonical chain. The shielded supply is the anonymity set every confidential output blends into.</span></p>
     <?php endif; ?>
   </div>
 </div>
@@ -82,36 +82,36 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       <div style="font-weight:600;color:var(--text)">MWEBscan: MWEB chain analysis &amp; privacy scoring</div>
       <p class="muted sub" style="margin:.3rem 0 0;text-align:left">Litecoin Explorer maps the public peg boundary (peg-ins, peg-outs and supply) from its own node. Its sister project <b>MWEBscan</b> adds the analysis layer on top: round-trip linking, privacy scoring and entity attribution.</p>
     </div>
-    <a class="btn" href="<?= h(ts_mwebscan_site($net)) ?>" target="_blank" rel="noopener" style="flex:none"><?= ts_icon('mweb') ?>Open MWEBscan</a>
+    <a class="btn" href="<?= h(lx_mwebscan_site($net)) ?>" target="_blank" rel="noopener" style="flex:none"><?= lx_icon('mweb') ?>Open MWEBscan</a>
   </div>
 </div>
 
 <?php if ($mwOn): ?>
 <?php if (is_array($mwStats) && isset($mwStats['stats'])): $S = $mwStats['stats']; ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('shield') ?>MWEB intelligence</span> <span class="sub">via MWEBscan<?php $fr = ts_mwebscan_freshness($mwStats); if ($fr !== ''): ?> &middot; <?= h($fr) ?><?php endif; ?></span></div>
+  <div class="card-h"><span><?= lx_icon('shield') ?>MWEB intelligence</span> <span class="sub">via MWEBscan<?php $fr = lx_mwebscan_freshness($mwStats); if ($fr !== ''): ?> &middot; <?= h($fr) ?><?php endif; ?></span></div>
   <div class="card-b">
     <div class="stat-grid">
-      <div class="stat"><div class="muted sub"><?= ts_icon('log-in') ?>Peg-ins</div><div class="big-num sm"><?= commas((int) ($S['total_pegins'] ?? 0)) ?></div><div class="muted sub">all-time</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('log-out') ?>Peg-outs</div><div class="big-num sm"><?= commas((int) ($S['total_pegouts'] ?? 0)) ?></div><div class="muted sub">all-time</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('at-sign') ?>Linkable peg-outs</div><div class="big-num sm"><?= commas((int) ($S['linkable_pegouts'] ?? 0)) ?></div><div class="muted sub"><?= commas((int) ($S['high_confidence_links'] ?? 0)) ?> high-confidence</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('eye-off') ?>Avg privacy</div><div class="big-num sm"><?= h(number_format((float) ($S['avg_privacy_score'] ?? 0), 0)) ?></div><div class="muted sub">/ 100</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('shield') ?>Avg peg-out risk</div><div class="big-num sm"><?= h(number_format((float) ($S['avg_pegout_risk'] ?? 0), 1)) ?></div><div class="muted sub">of 100</div></div>
-      <div class="stat"><div class="muted sub"><?= ts_icon('box') ?>Address clusters</div><div class="big-num sm"><?= commas((int) ($S['address_clusters'] ?? 0)) ?></div><div class="muted sub">common-input</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-in') ?>Peg-ins</div><div class="big-num sm"><?= commas((int) ($S['total_pegins'] ?? 0)) ?></div><div class="muted sub">all-time</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-out') ?>Peg-outs</div><div class="big-num sm"><?= commas((int) ($S['total_pegouts'] ?? 0)) ?></div><div class="muted sub">all-time</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('at-sign') ?>Linkable peg-outs</div><div class="big-num sm"><?= commas((int) ($S['linkable_pegouts'] ?? 0)) ?></div><div class="muted sub"><?= commas((int) ($S['high_confidence_links'] ?? 0)) ?> high-confidence</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('eye-off') ?>Avg privacy</div><div class="big-num sm"><?= h(number_format((float) ($S['avg_privacy_score'] ?? 0), 0)) ?></div><div class="muted sub">/ 100</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('shield') ?>Avg peg-out risk</div><div class="big-num sm"><?= h(number_format((float) ($S['avg_pegout_risk'] ?? 0), 1)) ?></div><div class="muted sub">of 100</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('box') ?>Address clusters</div><div class="big-num sm"><?= commas((int) ($S['address_clusters'] ?? 0)) ?></div><div class="muted sub">common-input</div></div>
     </div>
-    <p class="pnote"><?= ts_icon('info') ?><span>These are <b>inferences from public-chain data, not proof</b>. Peg-outs are correlated to earlier peg-ins by amount and timing. Data from <a class="ext" href="<?= h(ts_mwebscan_site($net)) ?>" target="_blank" rel="noopener">MWEBscan</a> (CC BY&nbsp;4.0).</span></p>
+    <p class="pnote"><?= lx_icon('info') ?><span>These are <b>inferences from public-chain data, not proof</b>. Peg-outs are correlated to earlier peg-ins by amount and timing. Data from <a class="ext" href="<?= h(lx_mwebscan_site($net)) ?>" target="_blank" rel="noopener">MWEBscan</a> (CC BY&nbsp;4.0).</span></p>
   </div>
 </div>
 <?php endif; ?>
 
 <?php if (is_array($mwLinks) && is_array($mwLinks['links'] ?? null) && $mwLinks['links']): ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('at-sign') ?>Recent linkable peg-outs</span> <span class="sub">round-trip analysis &middot; &ge;70% confidence</span></div>
+  <div class="card-h"><span><?= lx_icon('at-sign') ?>Recent linkable peg-outs</span> <span class="sub">round-trip analysis &middot; &ge;70% confidence</span></div>
   <div class="card-b nopad table-wrap">
     <table>
       <thead><tr><th>Peg-out</th><th>Linked peg-in</th><th class="amt">Amount</th><th class="amt">Confidence</th><th class="amt">Risk</th></tr></thead>
       <tbody>
-      <?php foreach ($mwLinks['links'] as $L): $reasons = ts_mwebscan_reasons($L['reasons'] ?? []); $c = (float) ($L['confidence'] ?? 0); $cc = $c >= 0.9 ? 'bad' : ($c >= 0.7 ? 'warn' : 'soft'); ?>
+      <?php foreach ($mwLinks['links'] as $L): $reasons = lx_mwebscan_reasons($L['reasons'] ?? []); $c = (float) ($L['confidence'] ?? 0); $cc = $c >= 0.9 ? 'bad' : ($c >= 0.7 ? 'warn' : 'soft'); ?>
         <tr>
           <td class="mono"><a class="addr" href="<?= h($base) ?>/tx/<?= h((string) ($L['pegout_txid'] ?? '')) ?>"><?= h(shorten((string) ($L['pegout_txid'] ?? ''))) ?></a><?php if (!empty($L['pegout_entity'])): ?> <span class="badge soft"><?= h((string) $L['pegout_entity']) ?></span><?php endif; ?></td>
           <td class="mono"><a class="addr" href="<?= h($base) ?>/tx/<?= h((string) ($L['pegin_txid'] ?? '')) ?>"><?= h(shorten((string) ($L['pegin_txid'] ?? ''))) ?></a></td>
@@ -123,12 +123,12 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       </tbody>
     </table>
   </div>
-  <div class="card-b"><a class="sub ext" href="<?= h(ts_mwebscan_site($net)) ?>" target="_blank" rel="noopener">Full round-trip analysis on MWEBscan &rarr;</a></div>
+  <div class="card-b"><a class="sub ext" href="<?= h(lx_mwebscan_site($net)) ?>" target="_blank" rel="noopener">Full round-trip analysis on MWEBscan &rarr;</a></div>
 </div>
 <?php endif; ?>
 
 <div class="card" id="pegcheck">
-  <div class="card-h"><span><?= ts_icon('eye-off') ?>Peg-out privacy check</span> <span class="sub">anonymity-set lookup</span></div>
+  <div class="card-h"><span><?= lx_icon('eye-off') ?>Peg-out privacy check</span> <span class="sub">anonymity-set lookup</span></div>
   <div class="card-b">
     <p class="muted sub">How well does a peg-out amount blend in? A common, round amount hides in a larger anonymity set; an exact or unusual amount is easier to link back to its peg-in.</p>
     <form method="get" action="<?= h($base) ?>/mweb#pegcheck">
@@ -152,7 +152,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 
 <?php if ($recent): ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('box') ?>MWEB blocks</span> <span class="sub">recent peg activity</span></div>
+  <div class="card-h"><span><?= lx_icon('box') ?>MWEB blocks</span> <span class="sub">recent peg activity</span></div>
   <div class="card-b nopad">
     <div class="blocks-strip">
       <?php foreach ($recent as $b):
@@ -162,10 +162,10 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       ?>
       <a class="blk conf" style="border-top-color:<?= $edge ?>" href="<?= h($base) ?>/block-height/<?= (int) $b['height'] ?>">
         <div class="blk-h">#<?= commas($b['height']) ?></div>
-        <?php if ($b['pegin_count'] > 0): ?><div class="blk-meta" style="color:var(--ok)">&#9650; <?= commas($b['pegin_count']) ?> &middot; <?= h(ts_coin($pin)) ?></div><?php endif; ?>
-        <?php if ($b['pegout_count'] > 0): ?><div class="blk-meta" style="color:var(--bad)">&#9660; <?= commas($b['pegout_count']) ?> &middot; <?= h(ts_coin($pout)) ?></div><?php endif; ?>
+        <?php if ($b['pegin_count'] > 0): ?><div class="blk-meta" style="color:var(--ok)">&#9650; <?= commas($b['pegin_count']) ?> &middot; <?= h(lx_coin($pin)) ?></div><?php endif; ?>
+        <?php if ($b['pegout_count'] > 0): ?><div class="blk-meta" style="color:var(--bad)">&#9660; <?= commas($b['pegout_count']) ?> &middot; <?= h(lx_coin($pout)) ?></div><?php endif; ?>
         <?php if ($b['pegin_count'] == 0 && $b['pegout_count'] == 0): ?><div class="blk-meta muted">no pegs</div><?php endif; ?>
-        <?php if ($b['supply_sat'] !== null): ?><div class="blk-age" title="<?= h(ts_coin((int) $b['supply_sat']) . ' ' . $net['unit']) ?> MWEB supply"><?= h(ts_num_compact((int) $b['supply_sat'] / 1e8)) ?> supply</div><?php endif; ?>
+        <?php if ($b['supply_sat'] !== null): ?><div class="blk-age" title="<?= h(lx_coin((int) $b['supply_sat']) . ' ' . $net['unit']) ?> MWEB supply"><?= h(lx_num_compact((int) $b['supply_sat'] / 1e8)) ?> supply</div><?php endif; ?>
       </a>
       <?php endforeach; ?>
     </div>
@@ -179,7 +179,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
     // ?r= selects the window (days); the series is daily so the limit ~= days.
     $ranges   = ['1m' => 30, '3m' => 90, '1y' => 365, 'all' => 2000];
     $rangeSel = (isset($_GET['r']) && is_string($_GET['r']) && isset($ranges[$_GET['r']])) ? $_GET['r'] : 'all';
-    $series = $idx ? ts_mweb_supply_series($net, $ranges[$rangeSel]) : [];
+    $series = $idx ? lx_mweb_supply_series($net, $ranges[$rangeSel]) : [];
     if ($idx):
         $enough = count($series) >= 2;
         $minT = $maxT = $minS = $maxS = 0;
@@ -193,10 +193,10 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
             $prevS = null;
             foreach ($series as $p) {
                 $sv = (int) $p['supply_sat'];
-                $supplyLabels[] = gmdate('Y-m-d', (int) $p['day_ts']) . ' · ' . ts_amount($net, $sv);
-                $supplyTips[] = ts_tip_json(gmdate('M j, Y', (int) $p['day_ts']), [
-                    ['c' => '#6c5ce7', 'k' => 'Supply', 'v' => ts_amount($net, $sv),
-                     'd' => $prevS !== null ? ts_pct_delta($sv, $prevS) : ''],
+                $supplyLabels[] = gmdate('Y-m-d', (int) $p['day_ts']) . ' · ' . lx_amount($net, $sv);
+                $supplyTips[] = lx_tip_json(gmdate('M j, Y', (int) $p['day_ts']), [
+                    ['c' => '#6c5ce7', 'k' => 'Supply', 'v' => lx_amount($net, $sv),
+                     'd' => $prevS !== null ? lx_pct_delta($sv, $prevS) : ''],
                 ]);
                 $prevS = $sv;
             }
@@ -224,12 +224,12 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
         };
 ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('trending-up') ?>MWEB supply</span> <span class="range-tog"<?= $enough ? ' title="' . h(gmdate('Y-m-d', $minT)) . ' to ' . h(gmdate('Y-m-d', $maxT)) . '"' : '' ?>><?php foreach (['1m' => '1M', '3m' => '3M', '1y' => '1Y', 'all' => 'All'] as $rk => $rl): ?><a<?= $rangeSel === $rk ? ' class="on"' : '' ?> href="?r=<?= $rk ?>"><?= $rl ?></a><?php endforeach; ?></span></div>
+  <div class="card-h"><span><?= lx_icon('trending-up') ?>MWEB supply</span> <span class="range-tog"<?= $enough ? ' title="' . h(gmdate('Y-m-d', $minT)) . ' to ' . h(gmdate('Y-m-d', $maxT)) . '"' : '' ?>><?php foreach (['1m' => '1M', '3m' => '3M', '1y' => '1Y', 'all' => 'All'] as $rk => $rl): ?><a<?= $rangeSel === $rk ? ' class="on"' : '' ?> href="?r=<?= $rk ?>"><?= $rl ?></a><?php endforeach; ?></span></div>
   <div class="card-b">
     <?php if ($enough): ?>
-    <?= ts_chart_area($series, 'day_ts', 'supply_sat', 'MWEB supply over time', $supplyLabels, [
+    <?= lx_chart_area($series, 'day_ts', 'supply_sat', 'MWEB supply over time', $supplyLabels, [
         'yfmt'   => $mwSupplyFmt,
-        'xticks' => ts_time_ticks($series, 'day_ts'),
+        'xticks' => lx_time_ticks($series, 'day_ts'),
         'tips'   => $supplyTips,
     ]) ?>
     <?php else: ?>
@@ -262,20 +262,20 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
     foreach ($flow as $p) {
         $pin = (int) $p['pegin_sat']; $pout = (int) $p['pegout_sat'];
         if ($pin > 0 || $pout > 0) { $hasFlow = true; }
-        $pegLabels[] = gmdate('Y-m-d', (int) $p['day_ts']) . ' · +' . ts_coin($pin) . ' / -' . ts_coin($pout);
-        $pegTips[] = ts_tip_json(($weekly ? 'Week ending ' : '') . gmdate('M j, Y', (int) $p['day_ts']), [
-            ['c' => 'var(--ok)',  'k' => 'Peg-in',  'v' => ts_amount($net, $pin)],
-            ['c' => 'var(--bad)', 'k' => 'Peg-out', 'v' => ts_amount($net, $pout)],
+        $pegLabels[] = gmdate('Y-m-d', (int) $p['day_ts']) . ' · +' . lx_coin($pin) . ' / -' . lx_coin($pout);
+        $pegTips[] = lx_tip_json(($weekly ? 'Week ending ' : '') . gmdate('M j, Y', (int) $p['day_ts']), [
+            ['c' => 'var(--ok)',  'k' => 'Peg-in',  'v' => lx_amount($net, $pin)],
+            ['c' => 'var(--bad)', 'k' => 'Peg-out', 'v' => lx_amount($net, $pout)],
         ]);
     }
     if ($idx && count($flow) >= 2 && $hasFlow):
 ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('repeat') ?>Peg flow</span> <span class="sub"><?= $weekly ? 'weekly' : 'daily' ?> peg-in vs peg-out</span></div>
+  <div class="card-h"><span><?= lx_icon('repeat') ?>Peg flow</span> <span class="sub"><?= $weekly ? 'weekly' : 'daily' ?> peg-in vs peg-out</span></div>
   <div class="card-b">
-    <?= ts_chart_diverging($flow, 'pegin_sat', 'pegout_sat', 'MWEB peg-in above centre, peg-out below', $pegLabels, [
+    <?= lx_chart_diverging($flow, 'pegin_sat', 'pegout_sat', 'MWEB peg-in above centre, peg-out below', $pegLabels, [
         'yfmt'   => $mwSupplyFmt,
-        'xticks' => ts_time_ticks($flow, 'day_ts'),
+        'xticks' => lx_time_ticks($flow, 'day_ts'),
         'tips'   => $pegTips,
         'legend' => [
             ['color' => 'var(--ok)',  'label' => 'Peg-in'],
@@ -287,7 +287,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 <?php endif; ?>
 
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('box') ?>Recent blocks</span> <span class="sub">last <?= count($recent) ?></span></div>
+  <div class="card-h"><span><?= lx_icon('box') ?>Recent blocks</span> <span class="sub">last <?= count($recent) ?></span></div>
   <div class="card-b nopad table-wrap">
     <table class="mweb-recent">
       <thead><tr><th>Height</th><th class="amt">Age</th><th class="amt">Peg-in</th><th class="amt">Peg-out</th><th class="amt">MWEB supply</th><th>HogEx</th></tr></thead>
@@ -296,13 +296,13 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
         <tr>
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $b['height'] ?>"><?= commas($b['height']) ?></a></td>
           <td class="amt" data-sort="<?= (int) ($b['block_time'] ?? 0) ?>"><?= !empty($b['block_time']) ? h(time_ago((int) $b['block_time'])) : '<span class="muted">-</span>' ?></td>
-          <td class="amt"><?php if ($b['pegin_count'] > 0): ?><?= commas($b['pegin_count']) ?> <span class="muted">·</span> <?= h(ts_coin((int) $b['pegin_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?php if ($b['pegout_count'] > 0): ?><?= commas($b['pegout_count']) ?> <span class="muted">·</span> <?= h(ts_coin((int) $b['pegout_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?= $b['supply_sat'] !== null ? h(ts_coin((int) $b['supply_sat'])) : '<span class="muted">-</span>' ?></td>
-          <td class="mono"><?php if (!empty($b['hogex_txid'])): ?><a class="addr" href="<?= h(ts_tx_href($net, $b['hogex_txid'])) ?>"><?= h(shorten($b['hogex_txid'])) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?php if ($b['pegin_count'] > 0): ?><?= commas($b['pegin_count']) ?> <span class="muted">·</span> <?= h(lx_coin((int) $b['pegin_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?php if ($b['pegout_count'] > 0): ?><?= commas($b['pegout_count']) ?> <span class="muted">·</span> <?= h(lx_coin((int) $b['pegout_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?= $b['supply_sat'] !== null ? h(lx_coin((int) $b['supply_sat'])) : '<span class="muted">-</span>' ?></td>
+          <td class="mono"><?php if (!empty($b['hogex_txid'])): ?><a class="addr" href="<?= h(lx_tx_href($net, $b['hogex_txid'])) ?>"><?= h(shorten($b['hogex_txid'])) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$recent): ?><tr><td colspan="6"><div class="empty"><?= ts_icon('inbox') ?><span>No MWEB blocks found near the tip.</span></div></td></tr><?php endif; ?>
+      <?php if (!$recent): ?><tr><td colspan="6"><div class="empty"><?= lx_icon('inbox') ?><span>No MWEB blocks found near the tip.</span></div></td></tr><?php endif; ?>
       </tbody>
     </table>
   </div>
@@ -311,11 +311,11 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 <?php if ($idx):
     $pb = isset($_GET['pb']) && is_string($_GET['pb']) ? $_GET['pb'] : null;
     $po = isset($_GET['po']) && is_string($_GET['po']) ? $_GET['po'] : null;
-    $pegins  = ts_mweb_pegins_page($net, $pb, 50);
-    $pegouts = ts_mweb_pegouts_page($net, $po, 50);
+    $pegins  = lx_mweb_pegins_page($net, $pb, 50);
+    $pegouts = lx_mweb_pegouts_page($net, $po, 50);
 ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('log-in') ?>Peg-ins</span> <span class="sub">public into MWEB</span></div>
+  <div class="card-h"><span><?= lx_icon('log-in') ?>Peg-ins</span> <span class="sub">public into MWEB</span></div>
   <div class="card-b nopad table-wrap">
     <table>
       <thead><tr><th>Height</th><th>Tx</th><th class="amt">Amount</th></tr></thead>
@@ -323,11 +323,11 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       <?php foreach ($pegins['pegins'] as $p): ?>
         <tr>
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $p['block_height'] ?>"><?= commas($p['block_height']) ?></a></td>
-          <td class="mono"><a class="addr" href="<?= h(ts_tx_href($net, $p['txid'])) ?>#out-<?= (int) $p['vout'] ?>"><?= h(shorten($p['txid'])) ?></a></td>
-          <td class="amt"><?= h(ts_coin((int) $p['value_sat'])) ?></td>
+          <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $p['txid'])) ?>#out-<?= (int) $p['vout'] ?>"><?= h(shorten($p['txid'])) ?></a></td>
+          <td class="amt"><?= h(lx_coin((int) $p['value_sat'])) ?></td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$pegins['pegins']): ?><tr><td colspan="3"><div class="empty"><?= ts_icon('inbox') ?><span>No peg-ins indexed.</span></div></td></tr><?php endif; ?>
+      <?php if (!$pegins['pegins']): ?><tr><td colspan="3"><div class="empty"><?= lx_icon('inbox') ?><span>No peg-ins indexed.</span></div></td></tr><?php endif; ?>
       </tbody>
     </table>
   </div>
@@ -337,7 +337,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 </div>
 
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('log-out') ?>Peg-outs</span> <span class="sub">MWEB back to public</span></div>
+  <div class="card-h"><span><?= lx_icon('log-out') ?>Peg-outs</span> <span class="sub">MWEB back to public</span></div>
   <div class="card-b nopad table-wrap">
     <table class="peg-tbl">
       <thead><tr><th>Height</th><th>HogEx</th><th>Destination</th><th class="amt">Amount</th></tr></thead>
@@ -345,12 +345,12 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       <?php foreach ($pegouts['pegouts'] as $p): ?>
         <tr>
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $p['block_height'] ?>"><?= commas($p['block_height']) ?></a></td>
-          <td class="mono"><a class="addr" href="<?= h(ts_tx_href($net, $p['txid'])) ?>"><?= h(shorten($p['txid'])) ?></a></td>
-          <td class="mono"><?php if (!empty($p['address'])): ?><a class="addr" href="<?= h(ts_addr_href($net, $p['address'])) ?>"><?= h(shorten($p['address'], 12, 6)) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?= h(ts_coin((int) $p['value_sat'])) ?></td>
+          <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $p['txid'])) ?>"><?= h(shorten($p['txid'])) ?></a></td>
+          <td class="mono"><?php if (!empty($p['address'])): ?><a class="addr" href="<?= h(lx_addr_href($net, $p['address'])) ?>"><?= h(shorten($p['address'], 12, 6)) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?= h(lx_coin((int) $p['value_sat'])) ?></td>
         </tr>
       <?php endforeach; ?>
-      <?php if (!$pegouts['pegouts']): ?><tr><td colspan="4"><div class="empty"><?= ts_icon('inbox') ?><span>No peg-outs indexed.</span></div></td></tr><?php endif; ?>
+      <?php if (!$pegouts['pegouts']): ?><tr><td colspan="4"><div class="empty"><?= lx_icon('inbox') ?><span>No peg-outs indexed.</span></div></td></tr><?php endif; ?>
       </tbody>
     </table>
   </div>
@@ -360,18 +360,18 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 </div>
 <?php endif; ?>
 
-<?php $clusters = $idx ? ts_mweb_pegout_clusters($net, 12) : []; if ($clusters): ?>
+<?php $clusters = $idx ? lx_mweb_pegout_clusters($net, 12) : []; if ($clusters): ?>
 <div class="card">
-  <div class="card-h"><span><?= ts_icon('repeat') ?>Peg-out address reuse</span> <span class="sub">clusterable destinations</span></div>
+  <div class="card-h"><span><?= lx_icon('repeat') ?>Peg-out address reuse</span> <span class="sub">clusterable destinations</span></div>
   <div class="card-b nopad table-wrap">
     <table>
       <thead><tr><th>Destination</th><th class="amt">Peg-outs</th><th class="amt">Total</th><th class="amt">Blocks</th></tr></thead>
       <tbody>
       <?php foreach ($clusters as $c): ?>
         <tr>
-          <td class="mono"><a class="addr" href="<?= h(ts_addr_href($net, $c['address'])) ?>"><?= h(shorten($c['address'], 12, 6)) ?></a></td>
+          <td class="mono"><a class="addr" href="<?= h(lx_addr_href($net, $c['address'])) ?>"><?= h(shorten($c['address'], 12, 6)) ?></a></td>
           <td class="amt"><?= commas($c['count']) ?></td>
-          <td class="amt"><?= h(ts_coin((int) $c['total_sat'])) ?></td>
+          <td class="amt"><?= h(lx_coin((int) $c['total_sat'])) ?></td>
           <td class="amt mono" data-sort="<?= (int) $c['last_h'] ?>"><?= commas($c['first_h']) ?><span class="muted">-</span><?= commas($c['last_h']) ?></td>
         </tr>
       <?php endforeach; ?>
@@ -383,10 +383,10 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
 <?php endif; ?>
 
 <div class="card guide">
-  <div class="card-h"><span><?= ts_icon('book-open') ?>MWEB privacy guide</span> <span class="sub">how the peg boundary leaks, and how to use it well</span></div>
+  <div class="card-h"><span><?= lx_icon('book-open') ?>MWEB privacy guide</span> <span class="sub">how the peg boundary leaks, and how to use it well</span></div>
   <div class="card-b">
     <details open>
-      <summary><?= ts_icon('eye-off') ?>What is public and what is private</summary>
+      <summary><?= lx_icon('eye-off') ?>What is public and what is private</summary>
       <div>
         <ul>
           <li><b>Public on the canonical chain:</b> a peg-in's amount and the ordinary Litecoin address that funded it; a peg-out's amount and destination address; and the block's absolute MWEB supply (each HogEx <code>vout[0]</code>).</li>
@@ -396,7 +396,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       </div>
     </details>
     <details>
-      <summary><?= ts_icon('shield') ?>Privacy best practices</summary>
+      <summary><?= lx_icon('shield') ?>Privacy best practices</summary>
       <div>
         <ul>
           <li><b>Let coins rest.</b> Time between peg-in and peg-out grows the set of MWEB activity you could be confused with. Immediate round-trips link the two ends by timing.</li>
@@ -408,7 +408,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       </div>
     </details>
     <details>
-      <summary><?= ts_icon('target') ?>Common mistakes that deanonymize you</summary>
+      <summary><?= lx_icon('target') ?>Common mistakes that deanonymize you</summary>
       <div>
         <ul>
           <li><b>Round-trip linkage:</b> peg in <em>X</em>, then peg out ~<em>X</em> a few blocks later; amount plus timing ties the two public transactions together.</li>
@@ -418,7 +418,7 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
         </ul>
       </div>
     </details>
-    <p class="pnote"><?= ts_icon('lock') ?><span>These are educational heuristics, not financial or security advice. MWEB hides amounts and ownership <em>inside</em> the extension block; it cannot un-see the public amounts you peg across the boundary.</span></p>
+    <p class="pnote"><?= lx_icon('lock') ?><span>These are educational heuristics, not financial or security advice. MWEB hides amounts and ownership <em>inside</em> the extension block; it cannot un-see the public amounts you peg across the boundary.</span></p>
   </div>
 </div>
 
@@ -427,4 +427,4 @@ ts_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
   <p class="muted sub mt-2">Send and receive MWEB with <a class="ext" href="https://litewallet.io" target="_blank" rel="noopener">Litewallet</a>.</p>
 </div></div>
 <?php endif; ?>
-<?php ts_foot($net); ?>
+<?php lx_foot($net); ?>

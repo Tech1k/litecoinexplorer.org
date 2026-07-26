@@ -6,7 +6,7 @@
  */
 $action = $GLOBALS['tool_action'] ?? null;
 $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
-$base = ts_u($net);
+$base = lx_u($net);
 $rawtx = trim($_POST['rawtx'] ?? '');
 
 $bcTxid = $bcError = $decoded = $decError = null;
@@ -19,7 +19,7 @@ $vm = null; $vmDone = false;
 // Node-hitting POST actions (broadcast/test/decode forward hex to litecoind for a full
 // parse). Throttle per IP so the tools page can't be scripted into an amplification flood.
 if ($isPost && in_array($action, ['broadcast', 'test', 'decode'], true)
-    && function_exists('ts_rate_limit') && !ts_rate_limit('tools_tx', 30, 60)) {
+    && function_exists('lx_rate_limit') && !lx_rate_limit('tools_tx', 30, 60)) {
     http_response_code(429);
     $isPost = false;   // skip the node calls; surface a friendly notice instead
     $rlMsg = 'Rate limit reached. Please wait a minute and try again.';
@@ -32,7 +32,7 @@ if ($isPost && $action === 'broadcast') {
     if ($rawtx === '') {
         $bcError = 'Paste a signed raw transaction (hex) first.';
     } else {
-        [$bcTxid, $bcError] = ts_broadcast($net, $rawtx);
+        [$bcTxid, $bcError] = lx_broadcast($net, $rawtx);
         if (!$bcTxid && !$bcError) { $bcError = 'Broadcast failed.'; }
     }
 }
@@ -40,7 +40,7 @@ if ($isPost && $action === 'test') {
     if ($rawtx === '') {
         $testErr = 'Paste a signed raw transaction (hex) first.';
     } else {
-        $testRes = ts_test_mempool_accept($net, $rawtx, trim($_POST['maxfee'] ?? ''));
+        $testRes = lx_test_mempool_accept($net, $rawtx, trim($_POST['maxfee'] ?? ''));
         if (isset($testRes['error'])) { $testErr = $testRes['error']; $testRes = null; }
     }
 }
@@ -48,29 +48,29 @@ if ($isPost && $action === 'decode') {
     if ($rawtx === '') {
         $decError = 'Paste a raw transaction (hex) first.';
     } else {
-        $decoded = ts_decode_rawtx($net, $rawtx);
+        $decoded = lx_decode_rawtx($net, $rawtx);
         if ($decoded === null) { $decError = 'Could not decode. That is not valid transaction hex.'; }
     }
 }
 if ($isPost && $action === 'script') {
-    $scriptRes = ts_decode_script($net, $_POST['hex'] ?? '');
+    $scriptRes = lx_decode_script($net, $_POST['hex'] ?? '');
     if ($scriptRes === null) { $scriptErr = 'Enter a valid script hex.'; }
 }
 if ($isPost && $action === 'psbt') {
-    $psbtRes = ts_decode_psbt($net, $_POST['psbt'] ?? '');
+    $psbtRes = lx_decode_psbt($net, $_POST['psbt'] ?? '');
     if ($psbtRes === null) { $psbtErr = 'Could not decode. Paste a base64 PSBT.'; }
 }
 if ($isPost && $action === 'opreturn') {
-    $orRes = ts_encode_op_return($_POST['data'] ?? '', ($_POST['fmt'] ?? 'text') === 'hex');
+    $orRes = lx_encode_op_return($_POST['data'] ?? '', ($_POST['fmt'] ?? 'text') === 'hex');
     if ($orRes === null) { $orErr = 'Enter some data to encode.'; }
     elseif (isset($orRes['error'])) { $orErr = $orRes['error']; $orRes = null; }
 }
 if ($isPost && $action === 'verifymsg') {
-    $vm = ts_verify_message($net, trim($_POST['addr'] ?? ''), trim($_POST['sig'] ?? ''), $_POST['msg'] ?? '');
+    $vm = lx_verify_message($net, trim($_POST['addr'] ?? ''), trim($_POST['sig'] ?? ''), $_POST['msg'] ?? '');
     $vmDone = true;
 }
 
-ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
+lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 ?>
 <h1>Tools</h1>
 
@@ -86,7 +86,7 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
     </form>
     <?php if ($bcTxid): ?>
       <div class="note ok break">Broadcast accepted. Txid:
-        <a class="addr" href="<?= h(ts_tx_href($net, $bcTxid)) ?>"><?= h($bcTxid) ?></a></div>
+        <a class="addr" href="<?= h(lx_tx_href($net, $bcTxid)) ?>"><?= h($bcTxid) ?></a></div>
     <?php elseif ($bcError): ?><div class="note bad break"><?= h($bcError) ?></div><?php endif; ?>
   </div>
 </div>
@@ -104,7 +104,7 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
     </form>
     <?php if ($testRes !== null): ?>
       <?php if ($testRes['allowed']): ?>
-      <div class="note ok break">Would be accepted.<?php if ($testRes['vsize'] !== null): ?> <span class="muted">vsize <?= commas($testRes['vsize']) ?> vB<?php if ($testRes['fee'] !== null): ?> &middot; fee <?= h(ts_coin((int) $testRes['fee'])) ?> <?= h($net['unit']) ?><?php endif; ?></span><?php endif; ?><?php if ($testRes['txid'] !== ''): ?><div class="mono sub mt-2"><?= h($testRes['txid']) ?></div><?php endif; ?></div>
+      <div class="note ok break">Would be accepted.<?php if ($testRes['vsize'] !== null): ?> <span class="muted">vsize <?= commas($testRes['vsize']) ?> vB<?php if ($testRes['fee'] !== null): ?> &middot; fee <?= h(lx_coin((int) $testRes['fee'])) ?> <?= h($net['unit']) ?><?php endif; ?></span><?php endif; ?><?php if ($testRes['txid'] !== ''): ?><div class="mono sub mt-2"><?= h($testRes['txid']) ?></div><?php endif; ?></div>
       <?php else: ?>
       <div class="note bad break">Would be rejected<?= $testRes['reject'] !== '' ? ': ' . h($testRes['reject']) : '.' ?></div>
       <?php endif; ?>
@@ -137,8 +137,8 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
       <table class="kv mt-3">
         <tr><th>Version / locktime</th><td><?= (int) $decoded['version'] ?> / <?= commas($decoded['locktime']) ?></td></tr>
         <tr><th>Size / weight</th><td><?= commas($decoded['size']) ?> B · <?= commas($decoded['weight']) ?> WU</td></tr>
-        <tr><th>Total output</th><td><?= h(ts_amount($net, $outSum)) ?></td></tr>
-        <?php if ($inKnown && $decoded['fee']): ?><tr><th>Fee</th><td><?= h(ts_amount($net, $decoded['fee'])) ?></td></tr><?php endif; ?>
+        <tr><th>Total output</th><td><?= h(lx_amount($net, $outSum)) ?></td></tr>
+        <?php if ($inKnown && $decoded['fee']): ?><tr><th>Fee</th><td><?= h(lx_amount($net, $decoded['fee'])) ?></td></tr><?php endif; ?>
       </table>
     </div>
   </div>
@@ -149,9 +149,9 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
           <div class="io-row">
             <?php if ($vi['is_coinbase']): ?><div class="io-addr"><span class="badge">Coinbase</span></div>
             <?php else: ?>
-              <div class="io-addr"><?= ts_addr_cell($net, $vi['prevout']['scriptpubkey_address'] ?? null, $vi['prevout']['scriptpubkey_type'] ?? '') ?></div>
-              <div class="io-meta"><a class="muted mono" href="<?= h(ts_tx_href($net, $vi['txid'])) ?>"><?= h(shorten($vi['txid'], 8, 6)) ?>:<?= (int) $vi['vout'] ?></a>
-                <span class="io-val"><?= $vi['prevout'] ? h(ts_coin($vi['prevout']['value'])) : '?' ?></span></div>
+              <div class="io-addr"><?= lx_addr_cell($net, $vi['prevout']['scriptpubkey_address'] ?? null, $vi['prevout']['scriptpubkey_type'] ?? '') ?></div>
+              <div class="io-meta"><a class="muted mono" href="<?= h(lx_tx_href($net, $vi['txid'])) ?>"><?= h(shorten($vi['txid'], 8, 6)) ?>:<?= (int) $vi['vout'] ?></a>
+                <span class="io-val"><?= $vi['prevout'] ? h(lx_coin($vi['prevout']['value'])) : '?' ?></span></div>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
@@ -161,11 +161,11 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
       <div class="card-b nopad">
         <?php foreach ($decoded['vout'] as $n => $vo): ?>
           <div class="io-row">
-            <div class="io-addr"><?= ts_addr_cell($net, $vo['scriptpubkey_address'] ?? null, $vo['scriptpubkey_type'] ?? '') ?>
-              <span class="badge soft"><?= h(ts_spk_label($vo['scriptpubkey_type'] ?? 'unknown')) ?></span></div>
-            <div class="io-meta"><span class="muted mono">#<?= $n ?></span><span class="io-val"><?= h(ts_coin($vo['value'] ?? 0)) ?></span></div>
+            <div class="io-addr"><?= lx_addr_cell($net, $vo['scriptpubkey_address'] ?? null, $vo['scriptpubkey_type'] ?? '') ?>
+              <span class="badge soft"><?= h(lx_spk_label($vo['scriptpubkey_type'] ?? 'unknown')) ?></span></div>
+            <div class="io-meta"><span class="muted mono">#<?= $n ?></span><span class="io-val"><?= h(lx_coin($vo['value'] ?? 0)) ?></span></div>
             <?php if (($vo['scriptpubkey_type'] ?? '') === 'op_return'): ?>
-              <?php foreach (ts_parse_op_return($vo['scriptpubkey'] ?? '') as $p): ?>
+              <?php foreach (lx_parse_op_return($vo['scriptpubkey'] ?? '') as $p): ?>
                 <div class="io-script break"><?php if ($p['text'] !== null): ?><span class="mono">"<?= h($p['text']) ?>"</span> <?php endif; ?><span class="mono muted"><?= h($p['hex']) ?></span></div>
               <?php endforeach; ?>
             <?php endif; ?>
@@ -192,10 +192,10 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
         <tr><th>Type</th><td><span class="badge soft"><?= h($scriptRes['type'] ?? 'unknown') ?></span></td></tr>
         <tr><th>ASM</th><td class="mono break"><?= h($scriptRes['asm'] ?? '') ?></td></tr>
         <?php $sa = $scriptRes['address'] ?? ($scriptRes['addresses'][0] ?? null); if ($sa): ?>
-          <tr><th>Address</th><td class="mono break"><a href="<?= h(ts_addr_href($net, $sa)) ?>"><?= h($sa) ?></a></td></tr>
+          <tr><th>Address</th><td class="mono break"><a href="<?= h(lx_addr_href($net, $sa)) ?>"><?= h($sa) ?></a></td></tr>
         <?php endif; ?>
-        <?php if (!empty($scriptRes['p2sh'])): ?><tr><th>Wrapped in P2SH</th><td class="mono break"><a href="<?= h(ts_addr_href($net, $scriptRes['p2sh'])) ?>"><?= h($scriptRes['p2sh']) ?></a></td></tr><?php endif; ?>
-        <?php if (!empty($scriptRes['segwit']['address'])): ?><tr><th>Wrapped in P2WSH</th><td class="mono break"><a href="<?= h(ts_addr_href($net, $scriptRes['segwit']['address'])) ?>"><?= h($scriptRes['segwit']['address']) ?></a></td></tr><?php endif; ?>
+        <?php if (!empty($scriptRes['p2sh'])): ?><tr><th>Wrapped in P2SH</th><td class="mono break"><a href="<?= h(lx_addr_href($net, $scriptRes['p2sh'])) ?>"><?= h($scriptRes['p2sh']) ?></a></td></tr><?php endif; ?>
+        <?php if (!empty($scriptRes['segwit']['address'])): ?><tr><th>Wrapped in P2WSH</th><td class="mono break"><a href="<?= h(lx_addr_href($net, $scriptRes['segwit']['address'])) ?>"><?= h($scriptRes['segwit']['address']) ?></a></td></tr><?php endif; ?>
       </table>
     <?php endif; ?>
   </div>
@@ -214,7 +214,7 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
       <?php $d = $psbtRes['decoded']; $a = $psbtRes['analysis']; $ptx = $d['tx'] ?? []; ?>
       <table class="kv mt-3">
         <tr><th>Inputs / outputs</th><td><?= count($ptx['vin'] ?? []) ?> / <?= count($ptx['vout'] ?? []) ?></td></tr>
-        <?php if (isset($d['fee'])): ?><tr><th>Fee</th><td><?= h(ts_amount($net, coin_to_sat($d['fee']))) ?></td></tr><?php endif; ?>
+        <?php if (isset($d['fee'])): ?><tr><th>Fee</th><td><?= h(lx_amount($net, coin_to_sat($d['fee']))) ?></td></tr><?php endif; ?>
         <?php if ($a && isset($a['next'])): ?><tr><th>Next step</th><td><span class="badge <?= $a['next'] === 'extractor' ? 'ok' : 'warn' ?>"><?= h($a['next']) ?></span> <?= $a['next'] === 'extractor' ? '(fully signed)' : '' ?></td></tr><?php endif; ?>
         <?php if ($a && !empty($a['error'])): ?><tr><th>Error</th><td class="bad break"><?= h($a['error']) ?></td></tr><?php endif; ?>
       </table>
@@ -225,7 +225,7 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
             $sigs = isset($pin['partial_signatures']) ? count($pin['partial_signatures']) : 0;
             $fin = !empty($pin['final_scriptSig']) || !empty($pin['final_scriptwitness']);
           ?>
-          in #<?= $i ?>: <?= $amt !== null ? h(ts_coin(coin_to_sat($amt))) . ' ' . h($net['unit']) : 'utxo unknown' ?>,
+          in #<?= $i ?>: <?= $amt !== null ? h(lx_coin(coin_to_sat($amt))) . ' ' . h($net['unit']) : 'utxo unknown' ?>,
           <?= $fin ? 'finalized' : ($sigs . ' sig' . ($sigs === 1 ? '' : 's')) ?><br>
         <?php endforeach; ?>
       </div>
@@ -278,4 +278,4 @@ ts_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
     <?php endif; ?>
   </div>
 </div>
-<?php ts_foot($net); ?>
+<?php lx_foot($net); ?>

@@ -10,14 +10,14 @@
  *   /api/…               Esplora / mempool.space REST API
  *
  * The registry keeps a 'slug' as an internal namespace (cache keys + the SQLite
- * `net` column); it never appears in a URL. ts_u()/ts_net_url() return '' so every
+ * `net` column); it never appears in a URL. lx_u()/lx_net_url() return '' so every
  * link is root-relative.
  *
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 /** Static chain parameters, keyed by network slug. */
-function ts_net_params(): array
+function lx_net_params(): array
 {
     return [
         'ltc-mainnet' => [
@@ -25,7 +25,7 @@ function ts_net_params(): array
             'kind'        => 'utxo',          // utxo (selects data layer + views)
             'coin'        => 'ltc',
             'network'     => 'mainnet',       // drives MWEBscan overlay + address codec
-            'path'        => 'ltc-mainnet',   // vestigial: root-level URLs (ts_u returns '')
+            'path'        => 'ltc-mainnet',   // vestigial: root-level URLs (lx_u returns '')
             'label'       => 'Litecoin',
             'short'       => 'Litecoin',
             'ticker'      => 'LTC',
@@ -57,16 +57,16 @@ function ts_net_params(): array
  * Resolve a network slug to its full merged config (static params + runtime
  * rpc/electrum), or null if unknown or disabled.
  */
-function ts_net(?string $slug): ?array
+function lx_net(?string $slug): ?array
 {
     if ($slug === null) {
         return null;
     }
-    $params = ts_net_params();
+    $params = lx_net_params();
     if (!isset($params[$slug])) {
         return null;
     }
-    $cfg = ts_config()['networks'][$slug] ?? null;
+    $cfg = lx_config()['networks'][$slug] ?? null;
     if (!$cfg || empty($cfg['enabled'])) {
         return null;
     }
@@ -78,24 +78,24 @@ function ts_net(?string $slug): ?array
  * The single enabled network for this root-served explorer. Returns the first
  * enabled net (there is only one), or null if none is configured/enabled.
  */
-function ts_net_default(): ?array
+function lx_net_default(): ?array
 {
-    $nets = ts_networks();
+    $nets = lx_networks();
     return $nets ? reset($nets) : null;
 }
 
-/** Resolve a coin + network to its net, e.g. ts_net_from_path('ltc','mainnet'). */
-function ts_net_from_path(string $coin, string $network): ?array
+/** Resolve a coin + network to its net, e.g. lx_net_from_path('ltc','mainnet'). */
+function lx_net_from_path(string $coin, string $network): ?array
 {
-    return ts_net($coin . '-' . $network);
+    return lx_net($coin . '-' . $network);
 }
 
 /** All enabled networks, in display order. */
-function ts_networks(): array
+function lx_networks(): array
 {
     $out = [];
-    foreach (array_keys(ts_net_params()) as $slug) {
-        $n = ts_net($slug);
+    foreach (array_keys(lx_net_params()) as $slug) {
+        $n = lx_net($slug);
         if ($n) {
             $out[$slug] = $n;
         }
@@ -104,9 +104,9 @@ function ts_networks(): array
 }
 
 /** Absolute URL base for the current request (https + sane Host). */
-function ts_base_url(): string
+function lx_base_url(): string
 {
-    $cfg = ts_config();
+    $cfg = lx_config();
     $canonical = $cfg['canonical_host'] ?? 'litecoinexplorer.org';
     // Only reflect a Host we trust into canonical/OG URLs. An allowlist
     // prevents canonical/cache poisoning from a spoofed Host header.
@@ -126,7 +126,7 @@ function ts_base_url(): string
  * every caller appends '/segment...', so '' yields clean root URLs (e.g.
  * '' . '/block/<hash>' -> '/block/<hash>').
  */
-function ts_net_url(array $net): string
+function lx_net_url(array $net): string
 {
     return '';
 }

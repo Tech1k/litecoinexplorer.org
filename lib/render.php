@@ -8,16 +8,16 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-/** UI base path for the network. Empty in single-chain root mode (see ts_net_url). */
-function ts_u(array $net): string
+/** UI base path for the network. Empty in single-chain root mode (see lx_net_url). */
+function lx_u(array $net): string
 {
-    return ts_net_url($net);
+    return lx_net_url($net);
 }
 
 /** Whether to show cross-links to external explorers (config-gated, default off). */
-function ts_extern_links(): bool
+function lx_extern_links(): bool
 {
-    return !empty(ts_config()['extern_links']);
+    return !empty(lx_config()['extern_links']);
 }
 
 /**
@@ -25,7 +25,7 @@ function ts_extern_links(): bool
  * currentColor stroke so it inherits theme colours; markup only, no external
  * requests, CSP-safe. Returns '' for an unknown name.
  */
-function ts_icon(string $name, string $cls = 'ico'): string
+function lx_icon(string $name, string $cls = 'ico'): string
 {
     static $p = [
         'box'         => '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
@@ -60,7 +60,7 @@ function ts_icon(string $name, string $cls = 'ico'): string
         'info'        => '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
         'list'        => '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
         // Litecoin's official MWEB mark (interwoven links). Carries its own viewBox
-        // and stroke weight, so ts_icon renders it with a custom frame below.
+        // and stroke weight, so lx_icon renders it with a custom frame below.
         'mweb'        => ['vb' => '291 226 36 36', 'sw' => '3.0', 'd' => '<path d="M301.921903,248.666801 L305.974805,252.626918 C308.824073,255.196225 311.554034,255.205436 314.164687,252.65455 C316.77534,250.103664 316.765913,247.436203 314.136407,244.652164 L310.083505,240.692048"/><path d="M310.077921,240.697503 L314.130824,244.65762 C316.980092,247.226927 319.710052,247.236138 322.320705,244.685252 C324.931358,242.134367 324.921931,239.466905 322.292425,236.682867 L318.239523,232.72275"/><path d="M316.621397,238.778699 L312.568495,234.818582 C309.719227,232.249275 306.989266,232.240064 304.378613,234.79095 C301.76796,237.341836 301.777387,240.009297 304.406893,242.793336 L308.459795,246.753452"/><path d="M308.465379,246.747997 L304.412476,242.78788 C301.563208,240.218573 298.833248,240.209362 296.222595,242.760248 C293.611942,245.311133 293.621369,247.978595 296.250875,250.762633 L300.303777,254.72275"/>'],
     ];
     if (!isset($p[$name])) {
@@ -79,11 +79,11 @@ function ts_icon(string $name, string $cls = 'ico'): string
  * <head> so the social/preview tags can't drift per-page. $image is a filename
  * under /assets (default og.png, 1200x630). Returns markup to emit in <head>.
  */
-function ts_meta_social(string $title, string $desc, string $url, string $image = 'og-banner.png'): string
+function lx_meta_social(string $title, string $desc, string $url, string $image = 'og-banner.png'): string
 {
     // A leading slash means an absolute site path (e.g. a dynamic /og/... card);
     // a bare name is a file under /assets.
-    $img = ($image !== '' && $image[0] === '/') ? ts_base_url() . $image : ts_base_url() . '/assets/' . $image;
+    $img = ($image !== '' && $image[0] === '/') ? lx_base_url() . $image : lx_base_url() . '/assets/' . $image;
     $t = h($title); $d = h($desc); $u = h($url); $i = h($img);
     return '<link rel="apple-touch-icon" href="/assets/icon-192.png">' . "\n"
         . '<meta property="og:type" content="website">' . "\n"
@@ -103,14 +103,14 @@ function ts_meta_social(string $title, string $desc, string $url, string $image 
 }
 
 /** Brand accent (single source of truth for the site-wide --brand var): Litecoin blue. */
-function ts_brand_color(string $coin): string
+function lx_brand_color(string $coin): string
 {
     $m = ['ltc' => '#4c84d6'];
     return isset($m[$coin]) ? $m[$coin] : '#4c84d6';
 }
 
 /** Format difficulty, keeping fractional detail on small/min-difficulty testnet values. */
-function ts_diff_str(float $d): string
+function lx_diff_str(float $d): string
 {
     if ($d >= 1000) {
         return number_format($d);
@@ -119,17 +119,17 @@ function ts_diff_str(float $d): string
 }
 
 /** Emit the document head, open <body>, render nav, open <main>. */
-function ts_head(array $net, array $opt = []): void
+function lx_head(array $net, array $opt = []): void
 {
     $title = $opt['title'] ?? ($net['label'] . ' Explorer');
     $chromeless = !empty($opt['chromeless']);   // TV / wall-display mode: no nav or footer
     $desc  = $opt['desc'] ?? ($net['label']
         . ' block explorer with MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.');
     $ogImage = $opt['og_image'] ?? 'og-banner.png';   // dynamic /og/... card or the static banner
-    $base  = ts_u($net);
+    $base  = lx_u($net);
     // Canonical points at the clean resource path, no query string (avoids
     // duplicate-content signals for ?after= pagination and /search).
-    $canon = ts_base_url() . (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+    $canon = lx_base_url() . (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
     $q = $opt['q'] ?? '';
     header('Content-Type: text/html; charset=utf-8');
     // Default edge-cache for GET HTML: a short shared-cache window lets a CDN
@@ -149,29 +149,29 @@ function ts_head(array $net, array $opt = []): void
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="/assets/theme-init.js?v=1"></script>
+<script src="/assets/theme-init.js?v=2"></script>
 <meta name="theme-color" content="#4c84d6">
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
 <title><?= h($title) ?></title>
 <meta name="description" content="<?= h($desc) ?>">
 <link rel="canonical" href="<?= h($canon) ?>">
-<?= ts_meta_social($title, $desc, $canon, $ogImage) ?>
+<?= lx_meta_social($title, $desc, $canon, $ogImage) ?>
 
 <script type="application/ld+json"><?= json_encode([
     '@context' => 'https://schema.org',
     '@type'    => 'WebSite',
     'name'     => 'Litecoin Explorer',
-    'url'      => ts_base_url() . '/',
+    'url'      => lx_base_url() . '/',
     'potentialAction' => [
         '@type'  => 'SearchAction',
-        'target' => ['@type' => 'EntryPoint', 'urlTemplate' => ts_base_url() . $base . '/search?q={query}'],
+        'target' => ['@type' => 'EntryPoint', 'urlTemplate' => lx_base_url() . $base . '/search?q={query}'],
         'query-input' => 'required name=query',
     ],
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
-<link rel="stylesheet" href="/assets/app.css?v=45">
+<link rel="stylesheet" href="/assets/app.css?v=46">
 </head>
-<body class="<?= $chromeless ? 'tv' : '' ?>" style="--brand:<?= h(ts_brand_color(isset($net['coin']) ? $net['coin'] : '')) ?>">
+<body class="<?= $chromeless ? 'tv' : '' ?>" style="--brand:<?= h(lx_brand_color(isset($net['coin']) ? $net['coin'] : '')) ?>">
 <?php if (!$chromeless): ?>
 <a class="skip-link" href="#main">Skip to content</a>
 <nav>
@@ -181,22 +181,22 @@ function ts_head(array $net, array $opt = []): void
       <input type="text" name="q" value="<?= h($q) ?>" placeholder="Search block, tx or address..." autocomplete="off" spellcheck="false" aria-label="Search">
       <button type="submit" class="btn sm" aria-label="Search">Search</button>
     </form>
-    <button type="button" class="nav-burger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links"><?= ts_icon('menu', 'ico') ?></button>
+    <button type="button" class="nav-burger" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links"><?= lx_icon('menu', 'ico') ?></button>
     <div class="nav-links" id="nav-links">
       <?php $isUtxo = ($net['kind'] ?? 'utxo') === 'utxo'; ?>
-      <a href="<?= h($base) ?>/blocks"><?= ts_icon('box') ?>Blocks</a>
-      <a href="<?= h($base) ?>/mempool"><?= ts_icon('clock') ?>Mempool</a>
-      <a href="<?= h($base) ?>/mining"><?= ts_icon('cpu') ?>Mining</a>
-      <?php if ($isUtxo): ?><a href="<?= h($base) ?>/charts"><?= ts_icon('trending-up') ?>Charts</a><?php endif; ?>
-      <?php if ($isUtxo): ?><a href="<?= h($base) ?>/node"><?= ts_icon('hard-drive') ?>Node</a><?php endif; ?>
-      <?php if (ts_mweb_enabled($net)): ?><a href="<?= h($base) ?>/mweb"><?= ts_icon('mweb') ?>MWEB</a><?php endif; ?>
-      <a href="<?= h($base) ?>/tools"><?= ts_icon('tool') ?>Tools</a>
-      <?php if ($isUtxo): ?><a href="/docs"><?= ts_icon('code') ?>API</a><?php endif; ?>
-      <a href="/donate"><?= ts_icon('heart') ?>Donate</a>
-      <?php $ccys = function_exists('ts_price_config') ? ts_price_config()['currencies'] : []; if (count($ccys) > 1): $ccyDef = strtoupper(ts_price_config()['display']); ?>
+      <a href="<?= h($base) ?>/blocks"><?= lx_icon('box') ?>Blocks</a>
+      <a href="<?= h($base) ?>/mempool"><?= lx_icon('clock') ?>Mempool</a>
+      <a href="<?= h($base) ?>/mining"><?= lx_icon('cpu') ?>Mining</a>
+      <?php if ($isUtxo): ?><a href="<?= h($base) ?>/charts"><?= lx_icon('trending-up') ?>Charts</a><?php endif; ?>
+      <?php if ($isUtxo): ?><a href="<?= h($base) ?>/node"><?= lx_icon('hard-drive') ?>Node</a><?php endif; ?>
+      <?php if (lx_mweb_enabled($net)): ?><a href="<?= h($base) ?>/mweb"><?= lx_icon('mweb') ?>MWEB</a><?php endif; ?>
+      <a href="<?= h($base) ?>/tools"><?= lx_icon('tool') ?>Tools</a>
+      <?php if ($isUtxo): ?><a href="/docs"><?= lx_icon('code') ?>API</a><?php endif; ?>
+      <a href="/donate"><?= lx_icon('heart') ?>Donate</a>
+      <?php $ccys = function_exists('lx_price_config') ? lx_price_config()['currencies'] : []; if (count($ccys) > 1): $ccyDef = strtoupper(lx_price_config()['display']); ?>
       <select class="ccy-sel" id="ccy-sel" data-default="<?= h($ccyDef) ?>" aria-label="Display currency" title="Display currency"><?php foreach ($ccys as $cc): $ccU = strtoupper($cc); ?><option value="<?= h($ccU) ?>"<?= $ccU === $ccyDef ? ' selected' : '' ?>><?= h($ccU) ?></option><?php endforeach; ?></select>
       <?php endif; ?>
-      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme"><?= ts_icon('sun', 'ico ico-sun') ?><?= ts_icon('moon', 'ico ico-moon') ?></button>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme"><?= lx_icon('sun', 'ico ico-sun') ?><?= lx_icon('moon', 'ico ico-moon') ?></button>
     </div>
   </div>
 </nav>
@@ -207,7 +207,7 @@ function ts_head(array $net, array $opt = []): void
 
 /** Close <main>, render footer + scripts, close document. */
 /** The shared site footer (identical on every page, standalone or network). */
-function ts_footer(): void
+function lx_footer(): void
 {
     ?>
 <footer>
@@ -226,13 +226,13 @@ function ts_footer(): void
 <?php
 }
 
-function ts_foot(array $net, array $opt = []): void
+function lx_foot(array $net, array $opt = []): void
 {
     ?>
 </main>
-<?php if (empty($opt['chromeless'])) { ts_footer(); } ?>
+<?php if (empty($opt['chromeless'])) { lx_footer(); } ?>
 <?php if (!empty($opt['qr'])): ?><script src="/assets/qrcode.js?v=1" defer></script><?php endif; ?>
-<script src="/assets/app.js?v=23" defer></script>
+<script src="/assets/app.js?v=24" defer></script>
 </body>
 </html>
 <?php
@@ -241,26 +241,26 @@ function ts_foot(array $net, array $opt = []): void
 // ---- formatting helpers ---------------------------------------------------
 
 /** Format integer satoshis as "0.00012340 LTC". */
-function ts_amount(array $net, int $sat): string
+function lx_amount(array $net, int $sat): string
 {
     return sat_to_coin($sat) . ' ' . $net['unit'];
 }
 
 /** Bare coin amount string (no unit). */
-function ts_coin(int $sat): string
+function lx_coin(int $sat): string
 {
     return sat_to_coin($sat);
 }
 
 /** Compact coin amount from satoshis for tight chart axes: 1e8 -> "1", 1e5 -> "0.001", 5e12 -> "50k". */
-function ts_coin_compact(float $sat): string
+function lx_coin_compact(float $sat): string
 {
     $c = $sat / 100000000;
     if ($c == 0.0) {
         return '0';
     }
     if (abs($c) >= 1000) {
-        return ts_num_compact($c);
+        return lx_num_compact($c);
     }
     if (abs($c) >= 1) {
         return rtrim(rtrim(number_format($c, 3, '.', ''), '0'), '.');
@@ -273,13 +273,13 @@ function ts_coin_compact(float $sat): string
  * MB (decimal). $unit is the base label ("B" for size, "vB" for virtual size),
  * so 8_400 → "8.4 kB" and 1_240_000 → "1.24 MB".
  */
-function ts_size_str(int $n, string $unit = 'B', float $step = 0.0): string
+function lx_size_str(int $n, string $unit = 'B', float $step = 0.0): string
 {
     if ($n >= 1000000) {
-        return number_format($n / 1000000, ts_step_dec($step / 1000000, 2)) . ' M' . $unit;
+        return number_format($n / 1000000, lx_step_dec($step / 1000000, 2)) . ' M' . $unit;
     }
     if ($n >= 1000) {
-        return number_format($n / 1000, ts_step_dec($step / 1000, 1)) . ' k' . $unit;
+        return number_format($n / 1000, lx_step_dec($step / 1000, 1)) . ' k' . $unit;
     }
     return $n . ' ' . $unit;
 }
@@ -291,7 +291,7 @@ function ts_size_str(int $n, string $unit = 'B', float $step = 0.0): string
  * as "current". A per-bar <title> gives a native hover tooltip. The <svg> fills
  * its container width at a fixed CSS height (preserveAspectRatio="none").
  */
-function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []): string
+function lx_chart_bars(array $bars, string $label = 'Activity', array $opts = []): string
 {
     static $gid = 0;
     $n = count($bars);
@@ -308,7 +308,7 @@ function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []
     // gridline, and draw the y-axis; the legacy path keeps the bare max-scaled bars.
     $plotMax = $max; $yt = null;
     if ($opts) {
-        $ax = ts_nice_bounds(0.0, $max, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
+        $ax = lx_nice_bounds(0.0, $max, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
         $plotMax = max(1e-9, $ax['max']);
         $yt = $ax['ticks'];
     }
@@ -319,20 +319,20 @@ function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []
     if ($yt !== null) {
         foreach ($yt as $t) {
             $gy = round($H * (1 - $t['f']), 2);
-            $grid .= '<line class="ts-grid" x1="0" y1="' . $gy . '" x2="' . $W . '" y2="' . $gy . '"/>';
+            $grid .= '<line class="lx-grid" x1="0" y1="' . $gy . '" x2="' . $W . '" y2="' . $gy . '"/>';
         }
     }
-    $svg = '<svg class="ts-bars" viewBox="0 0 ' . $W . ' ' . $H
+    $svg = '<svg class="lx-bars" viewBox="0 0 ' . $W . ' ' . $H
          . '" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '"' . ($opts ? ' tabindex="0"' : '') . '>'
          . '<defs><linearGradient id="' . $id . '" x1="0" y1="0" x2="0" y2="1">'
-         . '<stop offset="0" class="ts-bargrad-a"/><stop offset="1" class="ts-bargrad-b"/></linearGradient></defs>'
+         . '<stop offset="0" class="lx-bargrad-a"/><stop offset="1" class="lx-bargrad-b"/></linearGradient></defs>'
          . $grid;
     $x = 0.0; $hover = '';
     foreach ($bars as $i => $b) {
         $v  = (float) $b['value'];
         $bh = $v > 0 ? max($v / $plotMax * $H, 0.6) : 0.0;   // min visible height when nonzero
         $y  = $H - $bh;
-        $cls = ($i === $n - 1) ? 'ts-bar hot' : 'ts-bar';
+        $cls = ($i === $n - 1) ? 'lx-bar hot' : 'lx-bar';
         $svg .= '<rect class="' . $cls . '" fill="url(#' . $id . ')" x="' . round($x, 2) . '" y="' . round($y, 2)
               . '" width="' . round($bw, 2) . '" height="' . round($bh, 2) . '">';
         if (!$opts && !empty($b['title'])) {
@@ -345,7 +345,7 @@ function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []
             if (isset($opts['tips'][$i]) && $opts['tips'][$i] !== '') {
                 $attrs .= ' data-tip="' . h((string) $opts['tips'][$i]) . '"';
             }
-            $hover .= '<rect class="ts-hov" x="' . round($x, 2) . '" y="0" width="' . round($bw + $gap, 2)
+            $hover .= '<rect class="lx-hov" x="' . round($x, 2) . '" y="0" width="' . round($bw + $gap, 2)
                     . '" height="' . $H . '"' . $attrs . '><title>' . h((string) ($b['title'] ?? '')) . '</title></rect>';
         }
         $x += $bw + $gap;
@@ -354,11 +354,11 @@ function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []
     if (!$opts) {
         return $svg;
     }
-    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'ts_num_compact';
+    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'lx_num_compact';
     $ystep = count($yt) >= 2 ? abs($yt[1]['v'] - $yt[0]['v']) : 0.0;
     $ticks = [];
     foreach ($yt as $t) { $ticks[] = ['f' => $t['f'], 'label' => $fmt($t['v'], $ystep)]; }
-    return ts_chart_frame($svg, [
+    return lx_chart_frame($svg, [
         'ticks'  => $ticks,
         'xticks' => isset($opts['xticks']) ? $opts['xticks'] : [],
         'legend' => isset($opts['legend']) ? $opts['legend'] : [],
@@ -366,7 +366,7 @@ function ts_chart_bars(array $bars, string $label = 'Activity', array $opts = []
 }
 
 /** Nice step size for a range: 1/2/5x10^n so ~$count intervals span [$min,$max]. */
-function ts_nice_step(float $min, float $max, int $count = 4): float
+function lx_nice_step(float $min, float $max, int $count = 4): float
 {
     if ($max <= $min) { $max = $min + 1; }
     $raw  = ($max - $min) / max(1, $count);
@@ -381,9 +381,9 @@ function ts_nice_step(float $min, float $max, int $count = 4): float
  * data below the top gridline (no spike overshooting the axis). Returns
  * ['min','max','step','ticks'=>[['v'=>,'f'=>0..1 across [min,max]]]].
  */
-function ts_nice_bounds(float $min, float $max, int $count = 4): array
+function lx_nice_bounds(float $min, float $max, int $count = 4): array
 {
-    $step = ts_nice_step($min, $max, $count);
+    $step = lx_nice_step($min, $max, $count);
     $lo = floor($min / $step) * $step;
     $hi = ceil($max / $step) * $step;
     if ($hi - $max < $step * 0.001) { $hi += $step; }   // max landed on a tick -> add a step of headroom
@@ -397,7 +397,7 @@ function ts_nice_bounds(float $min, float $max, int $count = 4): array
 }
 
 /** Evenly spaced x-axis time ticks over $rows' $xKey (unix), as [['f'=>0..1,'label'=>date]]. */
-function ts_time_ticks(array $rows, string $xKey, int $count = 4): array
+function lx_time_ticks(array $rows, string $xKey, int $count = 4): array
 {
     if (count($rows) < 2) { return []; }
     $xs = [];
@@ -411,7 +411,7 @@ function ts_time_ticks(array $rows, string $xKey, int $count = 4): array
 }
 
 /** One point's data-tip JSON. $rows = [['c'=>color,'k'=>label,'v'=>fmtValue,'d'=>fmtDelta|null]]. */
-function ts_tip_json(string $header, array $rows): string
+function lx_tip_json(string $header, array $rows): string
 {
     $clean = [];
     foreach ($rows as $r) {
@@ -423,7 +423,7 @@ function ts_tip_json(string $header, array $rows): string
 }
 
 /** Signed percentage delta "+2.1%" / "-0.4%" (real minus sign) / '' for the first point. */
-function ts_pct_delta(float $cur, float $prev): string
+function lx_pct_delta(float $cur, float $prev): string
 {
     if ($prev == 0.0) { return ''; }
     $p = ($cur - $prev) / abs($prev) * 100;
@@ -438,11 +438,11 @@ function ts_pct_delta(float $cur, float $prev): string
  * (['color'=>,'label'=>]). The y-gutter grid cell shares the plot's height so
  * top:(1-f)*100% lines up with the SVG gridlines.
  */
-function ts_chart_frame(string $svg, array $opts = []): string
+function lx_chart_frame(string $svg, array $opts = []): string
 {
     $yax = '';
     if (!empty($opts['ticks'])) {
-        $yax = '<div class="ts-yax">';
+        $yax = '<div class="lx-yax">';
         foreach ($opts['ticks'] as $t) {
             $yax .= '<span style="top:' . round((1 - $t['f']) * 100, 2) . '%">' . h((string) $t['label']) . '</span>';
         }
@@ -450,7 +450,7 @@ function ts_chart_frame(string $svg, array $opts = []): string
     }
     $xax = '';
     if (!empty($opts['xticks'])) {
-        $xax = '<div class="ts-xax">';
+        $xax = '<div class="lx-xax">';
         foreach ($opts['xticks'] as $t) {
             $xax .= '<span style="left:' . round($t['f'] * 100, 2) . '%">' . h((string) $t['label']) . '</span>';
         }
@@ -458,16 +458,16 @@ function ts_chart_frame(string $svg, array $opts = []): string
     }
     $leg = '';
     if (!empty($opts['legend'])) {
-        $leg = '<figcaption class="ts-legend">';
+        $leg = '<figcaption class="lx-legend">';
         foreach ($opts['legend'] as $l) {
-            $leg .= '<span class="ts-leg"><i style="background:' . h($l['color']) . '"></i>' . h((string) $l['label']) . '</span>';
+            $leg .= '<span class="lx-leg"><i style="background:' . h($l['color']) . '"></i>' . h((string) $l['label']) . '</span>';
         }
         $leg .= '</figcaption>';
     }
-    return '<figure class="ts-chart">' . $yax
-         . '<div class="ts-plot">' . $svg . '<div class="ts-dot" hidden></div></div>'
+    return '<figure class="lx-chart">' . $yax
+         . '<div class="lx-plot">' . $svg . '<div class="lx-dot" hidden></div></div>'
          . $xax . $leg
-         . '<div class="ts-live" role="status" aria-live="polite"></div>'
+         . '<div class="lx-live" role="status" aria-live="polite"></div>'
          . '</figure>';
 }
 
@@ -478,7 +478,7 @@ function ts_chart_frame(string $svg, array $opts = []): string
  * it to a framed chart (HTML y/x axes, nice-value gridlines, rich per-point
  * tooltips, crosshair + dot); an empty $opts keeps the legacy bare-SVG output.
  */
-function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 'Series', array $labels = [], array $opts = []): string
+function lx_chart_area(array $rows, string $xKey, string $yKey, string $label = 'Series', array $labels = [], array $opts = []): string
 {
     static $gid = 0;
     $n = count($rows);
@@ -509,7 +509,7 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
     $plotMin = $minY; $plotSpan = $spanY;
     $yt = null;
     if ($opts && !$flat) {
-        $ax = ts_nice_bounds($minY, $maxY, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
+        $ax = lx_nice_bounds($minY, $maxY, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
         $plotMin  = $ax['min'];
         $plotSpan = max(1e-9, $ax['max'] - $ax['min']);
         $yt = $ax['ticks'];
@@ -520,16 +520,16 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
     if ($yt !== null) {
         foreach ($yt as $t) {
             $gy = round($pad + $ih * (1 - $t['f']), 2);
-            $grid .= '<line class="ts-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
+            $grid .= '<line class="lx-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
         }
         foreach ((isset($opts['xticks']) ? $opts['xticks'] : []) as $t) {
             $gx = round($pad + $t['f'] * $iw, 2);
-            $grid .= '<line class="ts-grid" x1="' . $gx . '" y1="' . $pad . '" x2="' . $gx . '" y2="' . round($pad + $ih, 2) . '"/>';
+            $grid .= '<line class="lx-grid" x1="' . $gx . '" y1="' . $pad . '" x2="' . $gx . '" y2="' . round($pad + $ih, 2) . '"/>';
         }
     } else {
         foreach ([0.25, 0.5, 0.75] as $g) {
             $gy = round($pad + $ih * $g, 2);
-            $grid .= '<line class="ts-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
+            $grid .= '<line class="lx-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
         }
     }
 
@@ -558,18 +558,18 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
                     $attrs .= ' data-tip="' . h((string) $opts['tips'][$i]) . '"';
                 }
             }
-            $hover .= '<rect class="ts-hov" x="' . round(max(0, $cx - $bw / 2), 2) . '" y="0" width="' . round($bw, 2)
+            $hover .= '<rect class="lx-hov" x="' . round(max(0, $cx - $bw / 2), 2) . '" y="0" width="' . round($bw, 2)
                     . '" height="' . $H . '"' . $attrs . '><title>' . h((string) ($labels[$i] ?? '')) . '</title></rect>';
         }
     }
 
-    $svg = '<svg class="ts-area" viewBox="0 0 ' . $W . ' ' . $H
+    $svg = '<svg class="lx-area" viewBox="0 0 ' . $W . ' ' . $H
          . '" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '"' . ($opts ? ' tabindex="0"' : '') . '>'
          . '<defs><linearGradient id="' . $id . '" x1="0" y1="0" x2="0" y2="1">'
-         . '<stop offset="0" class="ts-grad-a"/><stop offset="1" class="ts-grad-b"/></linearGradient></defs>'
+         . '<stop offset="0" class="lx-grad-a"/><stop offset="1" class="lx-grad-b"/></linearGradient></defs>'
          . $grid
          . '<polygon fill="url(#' . $id . ')" points="' . h($area) . '"/>'
-         . '<polyline class="ts-area-line" points="' . h($line) . '"/>'
+         . '<polyline class="lx-area-line" points="' . h($line) . '"/>'
          . $hover . '</svg>';
     if (!$opts) {
         return $svg;
@@ -578,7 +578,7 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
     // can pick enough precision to keep neighbouring ticks distinct; single-arg
     // formatters simply ignore the step. A flat series collapses to one centred
     // label (spreading identical labels over a straight line reads as broken).
-    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'ts_num_compact';
+    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'lx_num_compact';
     $ystep = count($yt) >= 2 ? abs($yt[1]['v'] - $yt[0]['v']) : 0.0;
     $ticks = [];
     if ($flat) {
@@ -588,7 +588,7 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
             $ticks[] = ['f' => $t['f'], 'label' => $fmt($t['v'], $ystep)];
         }
     }
-    return ts_chart_frame($svg, [
+    return lx_chart_frame($svg, [
         'ticks'  => $ticks,
         'xticks' => isset($opts['xticks']) ? $opts['xticks'] : [],
         'legend' => isset($opts['legend']) ? $opts['legend'] : [],
@@ -602,7 +602,7 @@ function ts_chart_area(array $rows, string $xKey, string $yKey, string $label = 
  * of assoc arrays; $upKey/$downKey name the numeric fields. Returns '' if empty
  * or all-zero.
  */
-function ts_chart_diverging(array $rows, string $upKey, string $downKey, string $label = 'Flow', array $labels = [], array $opts = []): string
+function lx_chart_diverging(array $rows, string $upKey, string $downKey, string $label = 'Flow', array $labels = [], array $opts = []): string
 {
     $n = count($rows);
     if ($n === 0) {
@@ -639,9 +639,9 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
     $slot = $W / $n;
     $gap  = min($n > 50 ? 0.15 : 0.4, $slot * 0.35);
     $bw   = $slot - $gap;
-    $svg = '<svg class="ts-diverge" viewBox="0 0 ' . $W . ' ' . $H
+    $svg = '<svg class="lx-diverge" viewBox="0 0 ' . $W . ' ' . $H
          . '" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '"' . ($opts ? ' tabindex="0"' : '') . '>';
-    $svg .= '<line class="ts-mid" x1="0" y1="' . $mid . '" x2="' . $W . '" y2="' . $mid . '"/>';
+    $svg .= '<line class="lx-mid" x1="0" y1="' . $mid . '" x2="' . $W . '" y2="' . $mid . '"/>';
     $x = 0.0;
     foreach ($rows as $r) {
         $u = (float) ($r[$upKey] ?? 0);
@@ -649,10 +649,10 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
         $uh = $u > 0 ? max(min($u / $scaleMax, 1.0) * $mid, 0.8) : 0.0;
         $dh = $d > 0 ? max(min($d / $scaleMax, 1.0) * $mid, 0.8) : 0.0;
         if ($uh > 0) {
-            $svg .= '<rect class="ts-up" x="' . round($x, 2) . '" y="' . round($mid - $uh, 2) . '" width="' . round($bw, 2) . '" height="' . round($uh, 2) . '"/>';
+            $svg .= '<rect class="lx-up" x="' . round($x, 2) . '" y="' . round($mid - $uh, 2) . '" width="' . round($bw, 2) . '" height="' . round($uh, 2) . '"/>';
         }
         if ($dh > 0) {
-            $svg .= '<rect class="ts-down" x="' . round($x, 2) . '" y="' . $mid . '" width="' . round($bw, 2) . '" height="' . round($dh, 2) . '"/>';
+            $svg .= '<rect class="lx-down" x="' . round($x, 2) . '" y="' . $mid . '" width="' . round($bw, 2) . '" height="' . round($dh, 2) . '"/>';
         }
         $x += $bw + $gap;
     }
@@ -666,7 +666,7 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
                     $attrs .= ' data-tip="' . h((string) $opts['tips'][$i]) . '"';
                 }
             }
-            $svg .= '<rect class="ts-hov" x="' . round($hx, 2) . '" y="0" width="' . round($bw + $gap, 2) . '" height="' . $H . '"' . $attrs . '><title>' . h((string) ($labels[$i] ?? '')) . '</title></rect>';
+            $svg .= '<rect class="lx-hov" x="' . round($hx, 2) . '" y="0" width="' . round($bw + $gap, 2) . '" height="' . $H . '"' . $attrs . '><title>' . h((string) ($labels[$i] ?? '')) . '</title></rect>';
             $hx += $bw + $gap;
         }
     }
@@ -675,7 +675,7 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
         return $svg;
     }
     // Symmetric y-axis around the zero centre line: +max at top, 0 mid, −max bottom.
-    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'ts_num_compact';
+    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'lx_num_compact';
     $ticks = [];
     foreach ([1.0, 0.75, 0.5, 0.25, 0.0] as $f) {
         $mag = abs($f - 0.5) * 2 * $scaleMax;
@@ -684,7 +684,7 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
         else               { $lbl = '0'; }
         $ticks[] = ['f' => $f, 'label' => $lbl];
     }
-    return ts_chart_frame($svg, [
+    return lx_chart_frame($svg, [
         'ticks'  => $ticks,
         'xticks' => isset($opts['xticks']) ? $opts['xticks'] : [],
         'legend' => isset($opts['legend']) ? $opts['legend'] : [],
@@ -697,7 +697,7 @@ function ts_chart_diverging(array $rows, string $upKey, string $downKey, string 
  * testnet actually sees still spread across the gradient. Returns an hsl() string
  * for inline style (allowed by the CSP's style-src 'unsafe-inline').
  */
-function ts_feerate_color(float $rate): string
+function lx_feerate_color(float $rate): string
 {
     if ($rate < 0.1) {
         $rate = 0.1;
@@ -712,9 +712,9 @@ function ts_feerate_color(float $rate): string
 /**
  * "Goggles" treemap of one projected mempool block: pending txs as fee-colored
  * cells stacked by vsize (highest fee at the bottom). CSP-safe SVG (fill is a
- * presentation attribute, not inline style). $b is a ts_projected_blocks entry.
+ * presentation attribute, not inline style). $b is a lx_projected_blocks entry.
  */
-function ts_goggles_block(array $b): string
+function lx_goggles_block(array $b): string
 {
     $cells = $b['cells'] ?? [];
     $total = max(1, (int) ($b['vsize'] ?? 1));
@@ -727,7 +727,7 @@ function ts_goggles_block(array $b): string
         if ($vs <= 0) {
             continue;
         }
-        $col = ts_feerate_color((float) $cell['rate']);
+        $col = lx_feerate_color((float) $cell['rate']);
         $n = count($bands);
         if ($n > 0 && $bands[$n - 1]['col'] === $col) {
             $bands[$n - 1]['vs'] += $vs;
@@ -758,7 +758,7 @@ function ts_goggles_block(array $b): string
  * trimmed. Used where space is tight (block-strip metadata) and full precision
  * would overflow.
  */
-function ts_num_compact(float $n, float $step = 0.0): string
+function lx_num_compact(float $n, float $step = 0.0): string
 {
     $a = abs($n);
     if ($a >= 1e9)     { $div = 1e9; $sfx = 'B'; $dec = 2; }
@@ -782,7 +782,7 @@ function ts_num_compact(float $n, float $step = 0.0): string
  * $keys are the numeric series stacked bottom→top, each filled with the matching
  * entry in $colors. Scaled to the largest per-row total. Returns '' if < 2 rows.
  */
-function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors, string $label = 'Stacked', array $opts = []): string
+function lx_chart_stacked(array $rows, string $xKey, array $keys, array $colors, string $label = 'Stacked', array $opts = []): string
 {
     $n = count($rows);
     if ($n < 2) {
@@ -802,7 +802,7 @@ function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors,
     // Framed: scale to enclosing "nice" bounds and draw the y-axis + gridlines.
     $plotMax = $maxTot; $yt = null;
     if ($opts) {
-        $ax = ts_nice_bounds(0.0, $maxTot, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
+        $ax = lx_nice_bounds(0.0, $maxTot, isset($opts['ytickn']) ? (int) $opts['ytickn'] : 4);
         $plotMax = max(1e-9, $ax['max']);
         $yt = $ax['ticks'];
     }
@@ -810,11 +810,11 @@ function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors,
     if ($yt !== null) {
         foreach ($yt as $t) {
             $gy = round($pad + $ih * (1 - $t['f']), 2);
-            $grid .= '<line class="ts-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
+            $grid .= '<line class="lx-grid" x1="' . $pad . '" y1="' . $gy . '" x2="' . round($pad + $iw, 2) . '" y2="' . $gy . '"/>';
         }
     }
     $base = array_fill(0, $n, 0.0);
-    $svg = '<svg class="ts-area" viewBox="0 0 ' . $W . ' ' . $H . '" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '"' . ($opts ? ' tabindex="0"' : '') . '>' . $grid;
+    $svg = '<svg class="lx-area" viewBox="0 0 ' . $W . ' ' . $H . '" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '"' . ($opts ? ' tabindex="0"' : '') . '>' . $grid;
     foreach ($keys as $ki => $k) {
         $pts = [];
         for ($i = 0; $i < $n; $i++) {
@@ -838,7 +838,7 @@ function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors,
             if (isset($opts['tips'][$i]) && $opts['tips'][$i] !== '') {
                 $attrs .= ' data-tip="' . h((string) $opts['tips'][$i]) . '"';
             }
-            $hover .= '<rect class="ts-hov" x="' . round(max(0, $cx - $bw / 2), 2) . '" y="0" width="' . round($bw, 2)
+            $hover .= '<rect class="lx-hov" x="' . round(max(0, $cx - $bw / 2), 2) . '" y="0" width="' . round($bw, 2)
                     . '" height="' . $H . '"' . $attrs . '><title>' . h((string) (isset($opts['labels'][$i]) ? $opts['labels'][$i] : '')) . '</title></rect>';
         }
     }
@@ -846,11 +846,11 @@ function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors,
     if (!$opts) {
         return $svg;
     }
-    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'ts_num_compact';
+    $fmt = isset($opts['yfmt']) ? $opts['yfmt'] : 'lx_num_compact';
     $ystep = count($yt) >= 2 ? abs($yt[1]['v'] - $yt[0]['v']) : 0.0;
     $ticks = [];
     foreach ($yt as $t) { $ticks[] = ['f' => $t['f'], 'label' => $fmt($t['v'], $ystep)]; }
-    return ts_chart_frame($svg, [
+    return lx_chart_frame($svg, [
         'ticks'  => $ticks,
         'xticks' => isset($opts['xticks']) ? $opts['xticks'] : [],
         'legend' => isset($opts['legend']) ? $opts['legend'] : [],
@@ -858,7 +858,7 @@ function ts_chart_stacked(array $rows, string $xKey, array $keys, array $colors,
 }
 
 /** Worst (largest) aspect ratio a treemap row would have if laid along a side of length $side. */
-function ts_tm_worst(array $areas, float $side): float
+function lx_tm_worst(array $areas, float $side): float
 {
     $sum = array_sum($areas);
     if ($sum <= 0 || $side <= 0) { return INF; }
@@ -873,7 +873,7 @@ function ts_tm_worst(array $areas, float $side): float
  * grown along the shorter side until adding another cell would worsen the aspect ratio.
  * Appends ['x','y','w','h','it'].
  */
-function ts_treemap_squarify(array $items, float $x, float $y, float $w, float $h, array &$cells): void
+function lx_treemap_squarify(array $items, float $x, float $y, float $w, float $h, array &$cells): void
 {
     $total = 0.0;
     foreach ($items as $it) { $total += (float) $it['v']; }
@@ -888,7 +888,7 @@ function ts_treemap_squarify(array $items, float $x, float $y, float $w, float $
         $rowA = [$q[$i]['a']]; $rowI = [$q[$i]]; $j = $i + 1;
         while ($j < $n) {
             $cand = $rowA; $cand[] = $q[$j]['a'];
-            if (ts_tm_worst($cand, $side) > ts_tm_worst($rowA, $side)) { break; }   // adding it makes cells worse
+            if (lx_tm_worst($cand, $side) > lx_tm_worst($rowA, $side)) { break; }   // adding it makes cells worse
             $rowA = $cand; $rowI[] = $q[$j]; $j++;
         }
         $sum = array_sum($rowA);
@@ -913,7 +913,7 @@ function ts_treemap_squarify(array $items, float $x, float $y, float $w, float $
  * 'txid'=>str], ...]. CSP-safe inline SVG; cells link to the tx. Borders come from CSS
  * (non-scaling 1px) so the stretched viewBox doesn't blow them up into thick bands.
  */
-function ts_block_treemap(array $items, string $label = 'Block transactions'): string
+function lx_block_treemap(array $items, string $label = 'Block transactions'): string
 {
     $items = array_values(array_filter($items, function ($i) { return (float) ($i['v'] ?? 0) > 0; }));
     if (!$items) {
@@ -924,21 +924,21 @@ function ts_block_treemap(array $items, string $label = 'Block transactions'): s
     // Lay out in a wide-short box whose aspect ratio the CSS mirrors (aspect-ratio:100/28),
     // so preserveAspectRatio="none" doesn't distort - cells stay square-ish on screen.
     $cells = [];
-    ts_treemap_squarify($items, 0, 0, 100, 28, $cells);
-    $svg = '<svg class="ts-treemap" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '">';
+    lx_treemap_squarify($items, 0, 0, 100, 28, $cells);
+    $svg = '<svg class="lx-treemap" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label="' . h($label) . '">';
     foreach ($cells as $c) {
         $it   = $c['it'];
         $rate = isset($it['rate']) ? (float) $it['rate'] : null;
-        $col  = $rate !== null ? ts_feerate_color($rate) : 'var(--accent)';
+        $col  = $rate !== null ? lx_feerate_color($rate) : 'var(--accent)';
         $tid  = (string) ($it['txid'] ?? '');
         $a    = $tid !== '' ? shorten($tid, 10, 6) : 'transaction';
-        $v    = ts_size_str((int) $it['v'], 'vB') . ($rate !== null ? ' · ' . number_format($rate, 1) . ' sat/vB' : '');
+        $v    = lx_size_str((int) $it['v'], 'vB') . ($rate !== null ? ' · ' . number_format($rate, 1) . ' sat/vB' : '');
         $rect = '<rect x="' . round($c['x'], 2) . '" y="' . round($c['y'], 2) . '" width="' . round($c['w'], 2)
               . '" height="' . round($c['h'], 2) . '" fill="' . h($col) . '" data-a="' . h($a) . '" data-v="' . h($v) . '"/>';
         // Fee-rate label on cells with room (uniform scaling keeps the text crisp).
         if ($rate !== null && $c['w'] >= 7.0 && $c['h'] >= 3.4) {
             $rlbl = $rate >= 10 ? number_format($rate, 0) : number_format($rate, 1);
-            $rect .= '<text class="ts-treemap-lbl" x="' . round($c['x'] + $c['w'] / 2, 2) . '" y="' . round($c['y'] + $c['h'] / 2, 2) . '">' . h($rlbl) . '</text>';
+            $rect .= '<text class="lx-treemap-lbl" x="' . round($c['x'] + $c['w'] / 2, 2) . '" y="' . round($c['y'] + $c['h'] / 2, 2) . '">' . h($rlbl) . '</text>';
         }
         $svg .= $tid !== '' ? '<a href="/tx/' . h($tid) . '">' . $rect . '</a>' : $rect;
     }
@@ -952,7 +952,7 @@ function ts_block_treemap(array $items, string $label = 'Block transactions'): s
  * at the centre) plus chevron caps on the inputs and pennant caps on the outputs. UTXO inputs
  * don't map to specific outputs, so the centre is the pooling point (in = out + fee). CSP-safe.
  */
-function ts_tx_flow(array $net, array $tx, array $outspends = []): string
+function lx_tx_flow(array $net, array $tx, array $outspends = []): string
 {
     $H = 48.0; $pad = 3.0; $barH = $H - 2 * $pad;
     $isCb = !empty($tx['vin'][0]['is_coinbase']);
@@ -972,7 +972,7 @@ function ts_tx_flow(array $net, array $tx, array $outspends = []): string
     foreach (($tx['vout'] ?? []) as $i => $vo) {
         $val = (int) ($vo['value'] ?? 0);
         $sp  = $outspends[$i] ?? null;
-        $outs[] = ['v' => $val, 'label' => $vo['scriptpubkey_address'] ?? ts_spk_label($vo['scriptpubkey_type'] ?? ''),
+        $outs[] = ['v' => $val, 'label' => $vo['scriptpubkey_address'] ?? lx_spk_label($vo['scriptpubkey_type'] ?? ''),
                    'href' => (is_array($sp) && !empty($sp['spent']) && !empty($sp['txid'])) ? '/tx/' . $sp['txid'] : null];
         $outSum += $val;
     }
@@ -1000,7 +1000,7 @@ function ts_tx_flow(array $net, array $tx, array $outspends = []): string
 
     $capL0 = 2.0; $bandL = 12.0; $cx = 50.0; $bandR = 88.0; $capR1 = 98.0;
     $y0 = $pad; $waistH = $barH * 0.68; $wTop = $pad + ($barH - $waistH) / 2.0;
-    $BLUE = 'url(#ts-flow-grad)'; $AMBER = '#e0a33a';
+    $BLUE = 'url(#lx-flow-grad)'; $AMBER = '#e0a33a';
 
     // Vertical fraction per segment WITH a floor, so a tiny output (e.g. a 2.6 LTC peg-out next
     // to a 337k LTC HogEx supply) still gets a visible, clickable band instead of a sub-pixel
@@ -1028,19 +1028,19 @@ function ts_tx_flow(array $net, array $tx, array $outspends = []): string
     // data-a / data-v feed the custom hover tooltip (app.js); no <title> so there's no clashing
     // native tooltip. Accessibility lives in the Inputs/Outputs table below.
     $aOf = function (array $s) { return !empty($s['fee']) ? 'Fee' : (string) $s['label']; };
-    $vOf = function (array $s) use ($unit) { return ts_coin((int) $s['v']) . ' ' . $unit; };
+    $vOf = function (array $s) use ($unit) { return lx_coin((int) $s['v']) . ' ' . $unit; };
     $wrap = function (string $shape, ?string $href) { return $href !== null ? '<a href="' . h($href) . '">' . $shape . '</a>' : $shape; };
 
-    $svg = '<svg class="ts-flow" viewBox="0 0 100 ' . $H . '" preserveAspectRatio="none" role="img" aria-label="Transaction value flow">';
+    $svg = '<svg class="lx-flow" viewBox="0 0 100 ' . $H . '" preserveAspectRatio="none" role="img" aria-label="Transaction value flow">';
     // Fixed x-positioned gradient: darkest at the outer tips, brightest through the centre.
-    $svg .= '<defs><linearGradient id="ts-flow-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">'
+    $svg .= '<defs><linearGradient id="lx-flow-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="0">'
           . '<stop offset="0" stop-color="#0c3a5f"/><stop offset="0.22" stop-color="#1c7fd6"/>'
           . '<stop offset="0.5" stop-color="#2ba4fa"/><stop offset="0.8" stop-color="#2189e2"/>'
           . '<stop offset="1" stop-color="#155f9f"/></linearGradient></defs>';
 
     $ribbon = function (float $x0, float $la, float $lb, float $x1, float $ra, float $rb, string $fill, array $s) use (&$svg, $aOf, $vOf, $wrap) {
         $mx = ($x0 + $x1) / 2.0;                         // S-curve control at the midpoint
-        $p = '<path class="ts-flow-ribbon" fill="' . $fill . '" data-a="' . h($aOf($s)) . '" data-v="' . h($vOf($s)) . '" d="M' . round($x0, 2) . ',' . round($la, 2)
+        $p = '<path class="lx-flow-ribbon" fill="' . $fill . '" data-a="' . h($aOf($s)) . '" data-v="' . h($vOf($s)) . '" d="M' . round($x0, 2) . ',' . round($la, 2)
               . ' C' . round($mx, 2) . ',' . round($la, 2) . ' ' . round($mx, 2) . ',' . round($ra, 2) . ' ' . round($x1, 2) . ',' . round($ra, 2)
               . ' L' . round($x1, 2) . ',' . round($rb, 2)
               . ' C' . round($mx, 2) . ',' . round($rb, 2) . ' ' . round($mx, 2) . ',' . round($lb, 2) . ' ' . round($x0, 2) . ',' . round($lb, 2)
@@ -1056,7 +1056,7 @@ function ts_tx_flow(array $net, array $tx, array $outspends = []): string
         $ribbon($cx, $wt, $wt + $wh, $bandR, $rt, $rt + $rh, empty($s['fee']) ? $BLUE : $AMBER, $s);
     }
     $cap = function (string $pts, string $fill, array $s) use (&$svg, $aOf, $vOf, $wrap) {
-        $svg .= $wrap('<polygon class="ts-flow-cap" points="' . $pts . '" fill="' . $fill . '" data-a="' . h($aOf($s)) . '" data-v="' . h($vOf($s)) . '"/>', $s['href'] ?? null);
+        $svg .= $wrap('<polygon class="lx-flow-cap" points="' . $pts . '" fill="' . $fill . '" data-a="' . h($aOf($s)) . '" data-v="' . h($vOf($s)) . '"/>', $s['href'] ?? null);
     };
     foreach ($ins as $k => $s) {                         // input chevron caps (point right)
         [$top, $hh] = $inL[$k]; $mid = $top + $hh / 2.0;
@@ -1071,23 +1071,23 @@ function ts_tx_flow(array $net, array $tx, array $outspends = []): string
     return $svg . '</svg>';
 }
 
-function ts_tx_href(array $net, string $txid): string
+function lx_tx_href(array $net, string $txid): string
 {
-    return ts_u($net) . '/tx/' . $txid;
+    return lx_u($net) . '/tx/' . $txid;
 }
 
-function ts_block_href(array $net, string $hash): string
+function lx_block_href(array $net, string $hash): string
 {
-    return ts_u($net) . '/block/' . $hash;
+    return lx_u($net) . '/block/' . $hash;
 }
 
-function ts_addr_href(array $net, string $addr): string
+function lx_addr_href(array $net, string $addr): string
 {
-    return ts_u($net) . '/address/' . rawurlencode($addr);
+    return lx_u($net) . '/address/' . rawurlencode($addr);
 }
 
 /** A confirmation badge for a tx/block status. */
-function ts_status_badge(array $net, array $status): string
+function lx_status_badge(array $net, array $status): string
 {
     if (empty($status['confirmed'])) {
         return '<span class="badge warn">Unconfirmed</span>';
@@ -1097,7 +1097,7 @@ function ts_status_badge(array $net, array $status): string
     if (!isset($status['block_height']) || $status['block_height'] === null) {
         return '<span class="badge ok">Confirmed</span>';
     }
-    $tip = ts_tip_height($net);
+    $tip = lx_tip_height($net);
     $conf = $tip - (int) $status['block_height'] + 1;
     if ($conf < 1) {
         $conf = 1;
@@ -1106,7 +1106,7 @@ function ts_status_badge(array $net, array $status): string
 }
 
 /** Short link to an address (or "unknown" for unspendable outputs). */
-function ts_addr_cell(array $net, ?string $addr, string $type = ''): string
+function lx_addr_cell(array $net, ?string $addr, string $type = ''): string
 {
     if ($addr === null || $addr === '') {
         $label = $type === 'op_return' ? 'OP_RETURN'
@@ -1115,7 +1115,7 @@ function ts_addr_cell(array $net, ?string $addr, string $type = ''): string
             : ($type === 'p2pk' ? 'P2PK' : 'Unparsed script')));
         return '<span class="muted">' . h($label) . '</span>';
     }
-    return '<a class="addr" href="' . h(ts_addr_href($net, $addr)) . '">' . h($addr) . '</a>';
+    return '<a class="addr" href="' . h(lx_addr_href($net, $addr)) . '">' . h($addr) . '</a>';
 }
 
 /**
@@ -1123,7 +1123,7 @@ function ts_addr_cell(array $net, ?string $addr, string $type = ''): string
  * their witness version (v0_p2wpkh, v1_p2tr, ...); this maps them to the familiar
  * P2WPKH / P2TR / ... abbreviations shown by mempool.space.
  */
-function ts_spk_label(string $type): string
+function lx_spk_label(string $type): string
 {
     static $m = [
         'v0_p2wpkh'            => 'P2WPKH',
