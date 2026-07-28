@@ -104,7 +104,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
     </form>
     <?php if ($testRes !== null): ?>
       <?php if ($testRes['allowed']): ?>
-      <div class="note ok break">Would be accepted.<?php if ($testRes['vsize'] !== null): ?> <span class="muted">vsize <?= commas($testRes['vsize']) ?> vB<?php if ($testRes['fee'] !== null): ?> &middot; fee <?= h(lx_coin((int) $testRes['fee'])) ?> <?= h($net['unit']) ?><?php endif; ?></span><?php endif; ?><?php if ($testRes['txid'] !== ''): ?><div class="mono sub mt-2"><?= h($testRes['txid']) ?></div><?php endif; ?></div>
+      <div class="note ok break">Would be accepted.<?php if ($testRes['vsize'] !== null): ?> <span class="muted">vsize <?= commas($testRes['vsize']) ?> vB<?php if ($testRes['fee'] !== null): ?> &middot; fee <?= lx_amount_el($net, (int) $testRes['fee']) ?><?php endif; ?></span><?php endif; ?><?php if ($testRes['txid'] !== ''): ?><div class="mono sub mt-2"><?= h($testRes['txid']) ?></div><?php endif; ?></div>
       <?php else: ?>
       <div class="note bad break">Would be rejected<?= $testRes['reject'] !== '' ? ': ' . h($testRes['reject']) : '.' ?></div>
       <?php endif; ?>
@@ -137,8 +137,8 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
       <table class="kv mt-3">
         <tr><th>Version / locktime</th><td><?= (int) $decoded['version'] ?> / <?= commas($decoded['locktime']) ?></td></tr>
         <tr><th>Size / weight</th><td><?= commas($decoded['size']) ?> B · <?= commas($decoded['weight']) ?> WU</td></tr>
-        <tr><th>Total output</th><td><?= h(lx_amount($net, $outSum)) ?></td></tr>
-        <?php if ($inKnown && $decoded['fee']): ?><tr><th>Fee</th><td><?= h(lx_amount($net, $decoded['fee'])) ?></td></tr><?php endif; ?>
+        <tr><th>Total output</th><td><?= lx_amount_el($net, (int) $outSum) ?></td></tr>
+        <?php if ($inKnown && $decoded['fee']): ?><tr><th>Fee</th><td><?= lx_amount_el($net, (int) $decoded['fee']) ?></td></tr><?php endif; ?>
       </table>
     </div>
   </div>
@@ -151,7 +151,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
             <?php else: ?>
               <div class="io-addr"><?= lx_addr_cell($net, $vi['prevout']['scriptpubkey_address'] ?? null, $vi['prevout']['scriptpubkey_type'] ?? '') ?></div>
               <div class="io-meta"><a class="muted mono" href="<?= h(lx_tx_href($net, $vi['txid'])) ?>"><?= h(shorten($vi['txid'], 8, 6)) ?>:<?= (int) $vi['vout'] ?></a>
-                <span class="io-val"><?= $vi['prevout'] ? h(lx_coin($vi['prevout']['value'])) : '?' ?></span></div>
+                <span class="io-val"><?= $vi['prevout'] ? lx_amount_el($net, (int) $vi['prevout']['value'], false) : '?' ?></span></div>
             <?php endif; ?>
           </div>
         <?php endforeach; ?>
@@ -163,7 +163,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
           <div class="io-row">
             <div class="io-addr"><?= lx_addr_cell($net, $vo['scriptpubkey_address'] ?? null, $vo['scriptpubkey_type'] ?? '') ?>
               <span class="badge soft"><?= h(lx_spk_label($vo['scriptpubkey_type'] ?? 'unknown')) ?></span></div>
-            <div class="io-meta"><span class="muted mono">#<?= $n ?></span><span class="io-val"><?= h(lx_coin($vo['value'] ?? 0)) ?></span></div>
+            <div class="io-meta"><span class="muted mono">#<?= $n ?></span><span class="io-val"><?= lx_amount_el($net, (int) ($vo['value'] ?? 0), false) ?></span></div>
             <?php if (($vo['scriptpubkey_type'] ?? '') === 'op_return'): ?>
               <?php foreach (lx_parse_op_return($vo['scriptpubkey'] ?? '') as $p): ?>
                 <div class="io-script break"><?php if ($p['text'] !== null): ?><span class="mono">"<?= h($p['text']) ?>"</span> <?php endif; ?><span class="mono muted"><?= h($p['hex']) ?></span></div>
@@ -204,7 +204,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 <div class="card" id="tool-psbt">
   <div class="card-h">Inspect PSBT</div>
   <div class="card-b">
-    <p class="muted sub">Decode a base64 PSBT: per-input prevout amounts, fee, signing progress, and whether it is finalized.</p>
+    <p class="muted sub">Decode a base64 PSBT: per-input prevout amounts, fee, signing progress, and whether it is finalised.</p>
     <form method="post" action="<?= h($base) ?>/psbt#tool-psbt">
       <textarea name="psbt" rows="3" placeholder="cHNidP8B..." spellcheck="false" autocomplete="off"><?= $action === 'psbt' ? h($_POST['psbt'] ?? '') : '' ?></textarea>
       <div class="row mt-2"><button class="btn" type="submit">Inspect</button></div>
@@ -214,7 +214,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
       <?php $d = $psbtRes['decoded']; $a = $psbtRes['analysis']; $ptx = $d['tx'] ?? []; ?>
       <table class="kv mt-3">
         <tr><th>Inputs / outputs</th><td><?= count($ptx['vin'] ?? []) ?> / <?= count($ptx['vout'] ?? []) ?></td></tr>
-        <?php if (isset($d['fee'])): ?><tr><th>Fee</th><td><?= h(lx_amount($net, coin_to_sat($d['fee']))) ?></td></tr><?php endif; ?>
+        <?php if (isset($d['fee'])): ?><tr><th>Fee</th><td><?= lx_amount_el($net, (int) coin_to_sat($d['fee'])) ?></td></tr><?php endif; ?>
         <?php if ($a && isset($a['next'])): ?><tr><th>Next step</th><td><span class="badge <?= $a['next'] === 'extractor' ? 'ok' : 'warn' ?>"><?= h($a['next']) ?></span> <?= $a['next'] === 'extractor' ? '(fully signed)' : '' ?></td></tr><?php endif; ?>
         <?php if ($a && !empty($a['error'])): ?><tr><th>Error</th><td class="bad break"><?= h($a['error']) ?></td></tr><?php endif; ?>
       </table>
@@ -225,8 +225,8 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
             $sigs = isset($pin['partial_signatures']) ? count($pin['partial_signatures']) : 0;
             $fin = !empty($pin['final_scriptSig']) || !empty($pin['final_scriptwitness']);
           ?>
-          in #<?= $i ?>: <?= $amt !== null ? h(lx_coin(coin_to_sat($amt))) . ' ' . h($net['unit']) : 'utxo unknown' ?>,
-          <?= $fin ? 'finalized' : ($sigs . ' sig' . ($sigs === 1 ? '' : 's')) ?><br>
+          in #<?= $i ?>: <?= $amt !== null ? lx_amount_el($net, (int) coin_to_sat($amt)) : 'utxo unknown' ?>,
+          <?= $fin ? 'finalised' : ($sigs . ' sig' . ($sigs === 1 ? '' : 's')) ?><br>
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
@@ -261,7 +261,7 @@ lx_head($net, ['title' => 'Tools - ' . $net['label'] . ' Explorer']);
 <div class="card" id="tool-verifymsg">
   <div class="card-h">Verify signed message</div>
   <div class="card-b">
-    <p class="muted sub">Verify a message signed by a legacy (m/n...) address. BIP-322 (segwit/taproot) is not supported by the node.</p>
+    <p class="muted sub">Verify a message signed by a legacy (L...) address. BIP-322 (segwit/taproot) is not supported by the node.</p>
     <form method="post" action="<?= h($base) ?>/verifymsg#tool-verifymsg">
       <label class="fld">Address</label>
       <input type="text" name="addr" value="<?= $action === 'verifymsg' ? h($_POST['addr'] ?? '') : '' ?>" spellcheck="false" autocomplete="off">

@@ -17,6 +17,9 @@
 
 function lx_tip_height(array $net): int
 {
+    // The 5s cache already collapses repeat reads within a request. Do NOT add a process-lifetime
+    // static memo here: ws-server.php is a long-running daemon, so a static would freeze the tip
+    // for the whole process and break new-block detection.
     return cache_remember('tiph:' . $net['slug'], 5, function () use ($net) {
         return (int) lx_rpc($net, 'getblockcount');
     });
@@ -777,6 +780,11 @@ function lx_esplora_block(array $net, string $hash): ?array
         'bits'              => isset($b['bits']) ? (int) hexdec($b['bits']) : 0,
         'difficulty'        => (float) ($b['difficulty'] ?? 0),
     ];
+    // getblock verbosity 1 already returns the txid list; warm that cache too so a
+    // following lx_block_txids (block page tx list, WS path) doesn't refetch the block.
+    if (isset($b['tx']) && is_array($b['tx'])) {
+        cache_set('btxids:' . $net['slug'] . ':' . $hash, json_encode($b['tx'], JSON_UNESCAPED_SLASHES), 0);
+    }
     cache_set($ckey, json_encode($blk, JSON_UNESCAPED_SLASHES), 0);
     return $blk;
 }
@@ -2032,6 +2040,32 @@ function lx_block_stats(array $net, string $hash, ?int $height = null): ?array
     $depth = lx_tip_height($net) - $out['height'];
     cache_set($ckey, json_encode($out, JSON_UNESCAPED_SLASHES), $depth > 100 ? 0 : 600);
     return $out;
+}
+
+/**
+ * Warm the getblockstats cache for a set of [height => hash] in ONE batched round-trip
+ * (skipping already-cached hashes), so range endpoints can prime stats and let the
+ * following per-block lx_block_stats calls hit cache instead of firing one each.
+ */
+function lx_warm_block_stats(array $net, array $heightToHash): void
+{
+    $tip = lx_tip_height($net);
+    $need = [];
+    foreach ($heightToHash as $h => $hash) {
+        if (cache_get('bstats2:' . $net['slug'] . ':' . $hash) === null) { $need[$h] = $hash; }
+    }
+    if (!$need) { return; }
+    $calls = [];
+    foreach ($need as $hash) { $calls[] = ['getblockstats', [$hash, lx_blockstats_fields()]]; }
+    $res = lx_rpc_batch($net, $calls);
+    $i = 0;
+    foreach ($need as $h => $hash) {
+        $s = $res[$i++] ?? null;
+        if (is_array($s)) {
+            $mapped = lx_map_blockstats($s, $hash, (int) $h);
+            cache_set('bstats2:' . $net['slug'] . ':' . $hash, json_encode($mapped, JSON_UNESCAPED_SLASHES), ($tip - $mapped['height']) > 100 ? 0 : 600);
+        }
+    }
 }
 
 /** Newest-first list of getblockstats for the last $count blocks (for the strip). */

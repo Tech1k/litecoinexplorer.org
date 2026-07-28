@@ -48,7 +48,7 @@ lx_head($net, ['title' => $label . ' - ' . $net['label'] . ' Explorer']);
         <div class="stat"><div class="muted sub">Median fee</div><div class="big-num sm" style="color:<?= h(lx_feerate_color($nb['med'])) ?>"><?= h(number_format($nb['med'], 1)) ?> <span class="blk-unit">sat/vB</span></div></div>
         <div class="stat"><div class="muted sub">Fee range</div><div><?= h($fr($nb['min'])) ?> &ndash; <?= h($fr($nb['max'])) ?> <span class="muted sub">sat/vB</span></div><div class="muted sub">avg <?= h(number_format($avgR, 1)) ?></div></div>
         <div class="stat"><div class="muted sub">Transactions</div><div class="big-num sm"><?= commas($nb['count']) ?></div></div>
-        <div class="stat"><div class="muted sub">Total fees</div><div><?= h(lx_amount($net, (int) $nb['fee'])) ?></div></div>
+        <div class="stat"><div class="muted sub">Total fees</div><div><?= lx_amount_el($net, (int) $nb['fee']) ?></div></div>
         <div class="stat"><div class="muted sub">Virtual size</div><div><?= h(lx_size_str($nbVs, 'vB')) ?> <span class="muted sub"><?= h(number_format($cap, $cap >= 99.5 ? 0 : 1)) ?>%</span></div></div>
         <div class="stat"><div class="muted sub">Expected in</div><div><?= h($eta) ?></div></div>
       </div>

@@ -143,7 +143,7 @@ if (count($dser) >= 2) {
     <div class="card-b">
       <div class="stat-grid">
         <div class="stat"><div class="muted sub"><?= lx_icon('gift') ?>Miners reward</div><div class="big-num sm"><?= h(lx_coin_compact($rwReward)) ?></div><div class="muted sub"><?= h($net['unit']) ?> · subsidy + fees</div></div>
-        <div class="stat"><div class="muted sub"><?= lx_icon('trending-up') ?>Avg block fees</div><div class="big-num sm"><?= h(lx_coin((int) round($rwAvgFees))) ?></div><div class="muted sub"><?= h($net['unit']) ?> / block</div></div>
+        <div class="stat"><div class="muted sub"><?= lx_icon('trending-up') ?>Avg block fees</div><div class="big-num sm"><?= lx_amount_el($net, (int) round($rwAvgFees), 'ext') ?></div><div class="muted sub"><span class="denom-unit"><?= h($net['unit']) ?></span> / block</div></div>
         <div class="stat"><div class="muted sub"><?= lx_icon('layers') ?>Avg tx fee</div><div class="big-num sm"><?= h(lx_num_compact($rwAvgTxFee)) ?></div><div class="muted sub">sats / tx</div></div>
       </div>
     </div>
@@ -210,7 +210,7 @@ if (count($dser) >= 2) {
           <td class="mono"><a href="<?= h($base) ?>/block/<?= h($b['hash']) ?>"><?= commas($b['height']) ?></a></td>
           <td><?php if ($bpool['pool'] !== null): ?><a class="badge soft" href="<?= h($base) ?>/mining/<?= h(rawurlencode($bpool['label'])) ?>"><?= h($bpool['label']) ?></a><?php else: ?><span class="muted"><?= h($bpool['label']) ?></span><?php endif; ?></td>
           <td><?php if ($baudit !== null): $hp = (float) $baudit['match_pct']; $hc = $hp >= 90 ? 'ok' : ($hp >= 70 ? 'soft' : 'bad'); ?><span class="badge <?= $hc ?>" title="<?= commas($baudit['matched']) ?> of <?= commas($baudit['mined']) ?> mined tx matched the projected template"><?= h(number_format($hp, 0)) ?>%</span><?php else: ?><span class="muted" title="No template snapshot was captured for this block">&ndash;</span><?php endif; ?></td>
-          <td class="amt mono"><?= h(lx_coin($breward)) ?> <span class="muted sub"><?= h($net['unit']) ?></span></td>
+          <td class="amt mono"><?= lx_amount_el($net, (int) $breward, 'ext') ?> <span class="muted sub denom-unit"><?= h($net['unit']) ?></span></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

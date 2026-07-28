@@ -38,11 +38,11 @@ if (is_array($net)) {
     ?><!DOCTYPE html>
 <html lang="en" data-theme="dark"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="/assets/theme-init.js?v=2"></script>
+<script src="/assets/theme-init.js?v=3"></script>
 <meta name="theme-color" content="#4c84d6">
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
-<link rel="stylesheet" href="/assets/app.css?v=46">
+<link rel="stylesheet" href="/assets/app.css?v=51">
 <title>Not found - Litecoin Explorer</title></head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -67,6 +67,6 @@ if (is_array($net)) {
 </div></div>
 </main>
 <?php lx_footer(); ?>
-<script src="/assets/app.js?v=26" defer></script>
+<script src="/assets/app.js?v=30" defer></script>
 </body></html><?php
 }

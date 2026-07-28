@@ -95,9 +95,9 @@ $bh = (int) $blk['height'];
   <div class="card-h"><span><?= lx_icon('trending-up') ?>Fees &amp; reward</span> <span class="sub"><?= commas($bstats['txs']) ?> tx</span></div>
   <div class="card-b nopad">
     <table class="kv">
-      <tr><th>Block reward</th><td><b><?= h(lx_coin($reward)) ?></b> <?= h($net['unit']) ?> <span class="muted">(subsidy + fees)</span></td></tr>
-      <tr><th>Subsidy</th><td><?= h(lx_coin($bstats['subsidy'])) ?> <?= h($net['unit']) ?></td></tr>
-      <tr><th>Total fees</th><td><?= h(lx_coin($bstats['total_fee'])) ?> <?= h($net['unit']) ?><?php if ($reward > 0): ?> <span class="muted">(<?= h(number_format($bstats['total_fee'] / $reward * 100, 1)) ?>% of reward)</span><?php endif; ?></td></tr>
+      <tr><th>Block reward</th><td><b><?= lx_amount_el($net, (int) $reward, 'ext') ?></b> <span class="denom-unit"><?= h($net['unit']) ?></span> <span class="muted">(subsidy + fees)</span></td></tr>
+      <tr><th>Subsidy</th><td><?= lx_amount_el($net, (int) $bstats['subsidy']) ?></td></tr>
+      <tr><th>Total fees</th><td><?= lx_amount_el($net, (int) $bstats['total_fee']) ?><?php if ($reward > 0): ?> <span class="muted">(<?= h(number_format($bstats['total_fee'] / $reward * 100, 1)) ?>% of reward)</span><?php endif; ?></td></tr>
       <?php if ($bstats['med_feerate'] > 0 || $bstats['max_feerate'] > 0): ?>
       <tr><th>Fee rate</th><td><span class="mono" style="color:<?= h(lx_feerate_color((float) $bstats['med_feerate'])) ?>"><?= h(number_format($bstats['med_feerate'], 2)) ?></span> sat/vB median <span class="muted">· <?= h(number_format($bstats['min_feerate'], 2)) ?>&ndash;<?= h(number_format($bstats['max_feerate'], 2)) ?> range</span></td></tr>
       <?php endif; ?>
@@ -155,10 +155,10 @@ if ($audit !== null):
   <div class="card-b">
     <table class="kv">
       <?php if ($mwebK !== null): ?><tr><th>Confidential txs</th><td><?= commas($mwebK) ?> <span class="muted sub">MWEB kernel<?= $mwebK === 1 ? '' : 's' ?> in this block</span></td></tr><?php endif; ?>
-      <tr><th>MWEB supply</th><td><?= h(lx_amount($net, (int) $mweb['supply_sat'])) ?></td></tr>
+      <tr><th>MWEB supply</th><td><?= lx_amount_el($net, (int) $mweb['supply_sat']) ?></td></tr>
       <tr><th>HogEx tx</th><td class="mono break"><a class="addr" href="<?= h(lx_tx_href($net, $mweb['hogex_txid'])) ?>"><?= h($mweb['hogex_txid']) ?></a></td></tr>
-      <tr><th>Peg-ins</th><td><?= commas($mweb['pegin_count']) ?><?php if ($mweb['pegin_count'] > 0): ?> <span class="muted">·</span> <?= h(lx_amount($net, (int) $mweb['pegin_total_sat'])) ?><?php endif; ?></td></tr>
-      <tr><th>Peg-outs</th><td><?= commas($mweb['pegout_count']) ?><?php if ($mweb['pegout_count'] > 0): ?> <span class="muted">·</span> <?= h(lx_amount($net, (int) $mweb['pegout_total_sat'])) ?><?php endif; ?></td></tr>
+      <tr><th>Peg-ins</th><td><?= commas($mweb['pegin_count']) ?><?php if ($mweb['pegin_count'] > 0): ?> <span class="muted">·</span> <?= lx_amount_el($net, (int) $mweb['pegin_total_sat']) ?><?php endif; ?></td></tr>
+      <tr><th>Peg-outs</th><td><?= commas($mweb['pegout_count']) ?><?php if ($mweb['pegout_count'] > 0): ?> <span class="muted">·</span> <?= lx_amount_el($net, (int) $mweb['pegout_total_sat']) ?><?php endif; ?></td></tr>
     </table>
     <?php if ($mweb['pegouts']): ?>
     <div class="table-wrap mt-3"><table>
@@ -167,7 +167,7 @@ if ($audit !== null):
       <?php foreach ($mweb['pegouts'] as $po): ?>
         <tr>
           <td class="mono break"><?php if (!empty($po['address'])): ?><a class="addr" href="<?= h(lx_addr_href($net, $po['address'])) ?>"><?= h($po['address']) ?></a><?php else: ?><span class="muted">unparsed</span><?php endif; ?></td>
-          <td class="amt"><?= h(lx_amount($net, (int) $po['value_sat'])) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $po['value_sat']) ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -180,7 +180,7 @@ if ($audit !== null):
       <?php foreach ($mweb['pegins'] as $pi): ?>
         <tr>
           <td class="mono break"><a class="addr" href="<?= h(lx_tx_href($net, $pi['txid'])) ?>#out-<?= (int) $pi['vout'] ?>"><?= h(shorten($pi['txid'])) ?>:<?= (int) $pi['vout'] ?></a></td>
-          <td class="amt"><?= h(lx_amount($net, (int) $pi['value_sat'])) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $pi['value_sat']) ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -273,8 +273,8 @@ if (count($txs) >= 2):
           <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $tx['txid'])) ?>"><?= h(shorten($tx['txid'])) ?></a>
             <?= !empty($tx['vin'][0]['is_coinbase']) ? '<span class="badge">coinbase</span>' : '' ?>
             <?php if ($mwebEnabled) { $mi = lx_mweb_tx_info($tx); if ($mi) { echo $mi['is_hogex'] ? '<span class="badge mweb">HogEx</span>' : ($mi['pegin_total_sat'] > 0 ? '<span class="badge mweb">Peg-in</span>' : ''); } } ?></td>
-          <td class="amt"><?= h(lx_coin($out)) ?></td>
-          <td class="amt"><?= !empty($tx['fee']) ? h(lx_coin($tx['fee'])) : '-' ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $out, false) ?></td>
+          <td class="amt"><?= !empty($tx['fee']) ? lx_amount_el($net, (int) $tx['fee'], false) : '-' ?></td>
           <td class="amt"><?= commas($tx['size'] ?? 0) ?> B</td>
         </tr>
       <?php endforeach; ?>

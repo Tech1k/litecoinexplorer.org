@@ -34,6 +34,8 @@ function lx_icon(string $name, string $cls = 'ico'): string
         'code'        => '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
         'heart'       => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
         'activity'    => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+        'share-2'     => '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
+        'copy'        => '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
         'zap'         => '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
         'trending-up' => '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
         'database'    => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
@@ -122,7 +124,6 @@ function lx_diff_str(float $d): string
 function lx_head(array $net, array $opt = []): void
 {
     $title = $opt['title'] ?? ($net['label'] . ' Explorer');
-    $chromeless = !empty($opt['chromeless']);   // TV / wall-display mode: no nav or footer
     $desc  = $opt['desc'] ?? ($net['label']
         . ' block explorer with first-class MWEB support. Blocks, transactions, addresses, mempool, mining and fees, live from the node.');
     $ogImage = $opt['og_image'] ?? 'og-banner.png';   // dynamic /og/... card or the static banner
@@ -149,7 +150,7 @@ function lx_head(array $net, array $opt = []): void
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="/assets/theme-init.js?v=2"></script>
+<script src="/assets/theme-init.js?v=3"></script>
 <meta name="theme-color" content="#4c84d6">
 <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -169,10 +170,9 @@ function lx_head(array $net, array $opt = []): void
         'query-input' => 'required name=query',
     ],
 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?></script>
-<link rel="stylesheet" href="/assets/app.css?v=46">
+<link rel="stylesheet" href="/assets/app.css?v=51">
 </head>
-<body class="<?= $chromeless ? 'tv' : '' ?>" style="--brand:<?= h(lx_brand_color(isset($net['coin']) ? $net['coin'] : '')) ?>">
-<?php if (!$chromeless): ?>
+<body style="--brand:<?= h(lx_brand_color(isset($net['coin']) ? $net['coin'] : '')) ?>">
 <a class="skip-link" href="#main">Skip to content</a>
 <nav>
   <div class="nav-inner">
@@ -196,16 +196,15 @@ function lx_head(array $net, array $opt = []): void
       <?php $ccys = function_exists('lx_price_config') ? lx_price_config()['currencies'] : []; if (count($ccys) > 1): $ccyDef = strtoupper(lx_price_config()['display']); ?>
       <select class="ccy-sel" id="ccy-sel" data-default="<?= h($ccyDef) ?>" aria-label="Display currency" title="Display currency"><?php foreach ($ccys as $cc): $ccU = strtoupper($cc); ?><option value="<?= h($ccU) ?>"<?= $ccU === $ccyDef ? ' selected' : '' ?>><?= h($ccU) ?></option><?php endforeach; ?></select>
       <?php endif; ?>
+      <select class="denom-sel" id="denom-sel" aria-label="Amount unit" title="Amount unit"><option value="ltc" selected>LTC</option><option value="mltc">mLTC</option><option value="lit">lit</option></select>
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme"><?= lx_icon('sun', 'ico ico-sun') ?><?= lx_icon('moon', 'ico ico-moon') ?></button>
     </div>
   </div>
 </nav>
-<?php endif; ?>
 <main id="main">
 <?php
 }
 
-/** Close <main>, render footer + scripts, close document. */
 /** The shared site footer (identical on every page, standalone or network). */
 function lx_footer(): void
 {
@@ -226,13 +225,16 @@ function lx_footer(): void
 <?php
 }
 
+/** Close <main>, render footer + scripts, close document. */
 function lx_foot(array $net, array $opt = []): void
 {
     ?>
 </main>
-<?php if (empty($opt['chromeless'])) { lx_footer(); } ?>
+<?php lx_footer(); ?>
+<span class="sr-only" id="copy-live" aria-live="polite"></span>   <!-- copy-success announcement for screen readers -->
+
 <?php if (!empty($opt['qr'])): ?><script src="/assets/qrcode.js?v=1" defer></script><?php endif; ?>
-<script src="/assets/app.js?v=26" defer></script>
+<script src="/assets/app.js?v=30" defer></script>
 </body>
 </html>
 <?php
@@ -250,6 +252,21 @@ function lx_amount(array $net, int $sat): string
 function lx_coin(int $sat): string
 {
     return sat_to_coin($sat);
+}
+
+/**
+ * A denomination-switchable amount. Server renders LTC (the default); app.js re-denominates
+ * the data-sat to mLTC / litoshi when the nav unit selector is changed. $unit:
+ *   true  - append the LTC ticker inline (prose / self-labeled amounts);
+ *   false - bare number (table cells); app.js appends the unit inline when switched;
+ *   'ext' - bare number whose unit is carried by a sibling .denom-unit label (big-num stat
+ *           cards); app.js must NOT append an inline unit or it would show twice.
+ */
+function lx_amount_el(array $net, int $sat, $unit = true): string
+{
+    $ext = ($unit === 'ext');
+    return '<span class="lx-amt" data-sat="' . $sat . '"' . ($ext ? ' data-extunit="1"' : '') . '>'
+         . h(sat_to_coin($sat)) . ($unit === true ? ' ' . h($net['unit']) : '') . '</span>';
 }
 
 /** Compact coin amount from satoshis for tight chart axes: 1e8 -> "1", 1e5 -> "0.001", 5e12 -> "50k". */
@@ -1071,6 +1088,83 @@ function lx_tx_flow(array $net, array $tx, array $outspends = []): string
     return $svg . '</svg>';
 }
 
+/**
+ * Transaction graph: funding txs -> this tx -> spending txs (or "unspent"), as a static,
+ * CSP-safe SVG node-link diagram. Node boxes are plain <a> links so click-to-navigate works
+ * with zero JS; edge thickness is value-weighted; a native <title> shows the full txid + value
+ * on hover. Reads the tx's inputs (source txids + values) and $outspends.
+ */
+function lx_tx_graph(array $net, array $tx, array $outspends = []): string
+{
+    $unit = $net['unit'];
+    $isCb = !empty($tx['vin'][0]['is_coinbase']);
+    $sid  = function (?string $s): string { $s = (string) $s; return strlen($s) > 11 ? substr($s, 0, 10) . "\u{2026}" : $s; };   // real ellipsis so the label can be h()-escaped
+
+    $left = [];
+    if ($isCb) {
+        $left[] = ['label' => 'Coinbase', 'href' => null, 'v' => 0, 'muted' => true, 'title' => 'Newly minted (coinbase)'];
+    } else {
+        foreach (($tx['vin'] ?? []) as $in) {
+            $src = $in['txid'] ?? null;
+            $v = isset($in['prevout']['value']) ? (int) $in['prevout']['value'] : 0;
+            $left[] = ['label' => $src ? $sid($src) : 'input', 'href' => $src ? '/tx/' . $src : null, 'v' => $v,
+                       'muted' => !$src, 'title' => ($src ?: 'input') . ($v > 0 ? ' · ' . lx_coin($v) . ' ' . $unit : '')];
+        }
+    }
+    $right = [];
+    foreach (($tx['vout'] ?? []) as $i => $vo) {
+        $v = (int) ($vo['value'] ?? 0);
+        $sp = $outspends[$i] ?? null;
+        $spent = is_array($sp) && !empty($sp['spent']) && !empty($sp['txid']);
+        $right[] = ['label' => $spent ? $sid($sp['txid']) : 'unspent', 'href' => $spent ? '/tx/' . $sp['txid'] : null,
+                    'v' => $v, 'unspent' => !$spent,
+                    'title' => ($spent ? (string) $sp['txid'] : 'Unspent output') . ($v > 0 ? ' · ' . lx_coin($v) . ' ' . $unit : '')];
+    }
+    $capf = function (array $segs, string $noun) {   // keep the 7 biggest, pool the rest into one node
+        if (count($segs) <= 8) { return $segs; }
+        usort($segs, function ($a, $b) { return $b['v'] <=> $a['v']; });
+        $keep = array_slice($segs, 0, 7);
+        $n = count($segs) - 7;
+        $keep[] = ['label' => $n . ' more', 'href' => null, 'v' => 0, 'muted' => true, 'title' => $n . ' more ' . $noun];
+        return $keep;
+    };
+    $left = $capf($left, 'funders'); $right = $capf($right, 'spenders');
+
+    $W = 480.0; $bw = 118.0; $bh = 30.0; $vg = 14.0; $m = 14.0;
+    $rows = max(count($left), count($right), 1);
+    $H = $rows * $bh + ($rows - 1) * $vg + 2 * $m;
+    $lx = 6.0; $cxL = ($W - $bw) / 2.0; $rx = $W - 6.0 - $bw; $cy = $H / 2.0;
+    $top = function (int $n) use ($H, $bh, $vg) { return ($H - ($n * $bh + max(0, $n - 1) * $vg)) / 2.0; };
+    $mv  = function (array $segs) { $x = 0; foreach ($segs as $s) { if ($s['v'] > $x) { $x = $s['v']; } } return $x; };
+    $ew  = function (int $v, int $max) { return $max > 0 ? round(1.0 + 3.2 * ($v / $max), 2) : 1.4; };   // value-weighted stroke, floored
+    $mvL = $mv($left); $mvR = $mv($right);
+
+    $svg = '<svg class="lx-txg" viewBox="0 0 480 ' . round($H, 1) . '" role="img" aria-label="Transaction graph: funders, this transaction, spenders">';
+    $lt = $top(count($left)); $rt = $top(count($right));
+    foreach ($left as $k => $s) {
+        $y = $lt + $k * ($bh + $vg) + $bh / 2.0; $x0 = $lx + $bw; $x1 = $cxL; $mx = ($x0 + $x1) / 2.0;
+        $svg .= '<path class="lx-txg-edge" stroke-width="' . $ew($s['v'], $mvL) . '" d="M' . round($x0, 1) . ',' . round($y, 1)
+              . ' C' . round($mx, 1) . ',' . round($y, 1) . ' ' . round($mx, 1) . ',' . round($cy, 1) . ' ' . round($x1, 1) . ',' . round($cy, 1) . '"/>';
+    }
+    foreach ($right as $k => $s) {
+        $y = $rt + $k * ($bh + $vg) + $bh / 2.0; $x0 = $cxL + $bw; $x1 = $rx; $mx = ($x0 + $x1) / 2.0;
+        $svg .= '<path class="lx-txg-edge" stroke-width="' . $ew($s['v'], $mvR) . '" d="M' . round($x0, 1) . ',' . round($cy, 1)
+              . ' C' . round($mx, 1) . ',' . round($cy, 1) . ' ' . round($mx, 1) . ',' . round($y, 1) . ' ' . round($x1, 1) . ',' . round($y, 1) . '"/>';
+    }
+    $node = function (float $x, float $y, array $s) use ($bw, $bh) {
+        $bc = 'lx-txg-box' . (!empty($s['this']) ? ' this' : '') . (!empty($s['unspent']) ? ' unspent' : '');
+        $tc = 'lx-txg-lbl' . (!empty($s['this']) ? ' this' : '') . ((!empty($s['muted']) || !empty($s['unspent'])) ? ' muted' : '');
+        $g = '<g><title>' . h($s['title'] ?? $s['label']) . '</title>'
+           . '<rect class="' . $bc . '" x="' . round($x, 1) . '" y="' . round($y, 1) . '" width="118" height="30" rx="6"/>'
+           . '<text class="' . $tc . '" x="' . round($x + $bw / 2, 1) . '" y="' . round($y + $bh / 2, 1) . '">' . h((string) $s['label']) . '</text></g>';
+        return !empty($s['href']) ? '<a href="' . h($s['href']) . '">' . $g . '</a>' : $g;
+    };
+    foreach ($left as $k => $s) { $svg .= $node($lx, $lt + $k * ($bh + $vg), $s); }
+    $svg .= $node($cxL, $cy - $bh / 2.0, ['label' => $sid($tx['txid'] ?? ''), 'title' => (string) ($tx['txid'] ?? 'this transaction'), 'this' => true]);
+    foreach ($right as $k => $s) { $svg .= $node($rx, $rt + $k * ($bh + $vg), $s); }
+    return $svg . '</svg>';
+}
+
 function lx_tx_href(array $net, string $txid): string
 {
     return lx_u($net) . '/tx/' . $txid;
@@ -1106,7 +1200,7 @@ function lx_status_badge(array $net, array $status): string
 }
 
 /** Short link to an address (or "unknown" for unspendable outputs). */
-function lx_addr_cell(array $net, ?string $addr, string $type = ''): string
+function lx_addr_cell(array $net, ?string $addr, string $type = '', bool $copy = false): string
 {
     if ($addr === null || $addr === '') {
         $label = $type === 'op_return' ? 'OP_RETURN'
@@ -1115,7 +1209,12 @@ function lx_addr_cell(array $net, ?string $addr, string $type = ''): string
             : ($type === 'p2pk' ? 'P2PK' : 'Unparsed script')));
         return '<span class="muted">' . h($label) . '</span>';
     }
-    return '<a class="addr" href="' . h(lx_addr_href($net, $addr)) . '">' . h($addr) . '</a>';
+    $cell = '<a class="addr" href="' . h(lx_addr_href($net, $addr)) . '">' . h($addr) . '</a>';
+    if ($copy) {
+        $cell .= '<button class="addr-copy" type="button" data-copy="' . h($addr)
+               . '" aria-label="Copy address" title="Copy address">' . lx_icon('copy', 'ico') . '</button>';
+    }
+    return $cell;
 }
 
 /**

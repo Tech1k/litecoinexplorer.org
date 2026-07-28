@@ -80,6 +80,15 @@ main{max-width:1100px;margin:var(--s5) auto 70px;padding:0 20px}
 .badge.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
 .badge.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
 .badge.soft{color:var(--accent);background:var(--accent-bg);border-color:transparent}
+.badge.off{color:var(--muted);background:transparent;border:1px dashed var(--border)}   /* feature absent: AA contrast + dashed, no opacity/strikethrough */
+a.badge{text-decoration:none}
+a.badge:hover{text-decoration:none;filter:brightness(1.12)}
+/* "show N more" expander for very long tx input/output lists (zero-JS, defers layout of the overflow) */
+.io-more{display:block}
+.io-more>summary{cursor:pointer;list-style:none;padding:11px 14px;color:var(--accent);font-weight:600;font-size:13px;border-top:1px solid var(--border)}
+.io-more>summary::-webkit-details-marker{display:none}
+.io-more>summary::before{content:"+ ";color:var(--faint)}
+.io-more[open]>summary::before{content:"\2212 "}
 .badge.mweb{color:#fff;background:#6c5ce7;border-color:transparent}
 .mweb-chart{display:block;width:100%;height:200px}
 .mweb-chart-line{fill:none;stroke:#6c5ce7;stroke-width:2;vector-effect:non-scaling-stroke}
@@ -110,6 +119,11 @@ thead th{color:var(--muted);font-weight:600;font-size:12px;text-transform:upperc
 tbody tr:last-child td{border-bottom:none}
 td.amt,th.amt{text-align:right;font-family:var(--mono);white-space:nowrap}
 .addr{font-family:var(--mono)}
+/* inline copy control next to an address (opt-in via lx_addr_cell) */
+.addr-copy{display:inline-flex;align-items:center;justify-content:center;background:none;border:0;padding:2px;margin-left:4px;color:var(--faint);cursor:pointer;border-radius:4px;vertical-align:middle;line-height:0}
+.addr-copy .ico{width:13px;height:13px}
+.addr-copy:hover{color:var(--accent)}
+.addr-copy.copied{color:var(--ok)}
 .card.hero .addr{overflow-wrap:anywhere;word-break:break-all}   /* full tip hash must wrap on phones */
 table.kv th{width:170px;color:var(--muted);font-weight:600;vertical-align:top}
 table.kv td{font-size:13.5px}
@@ -222,6 +236,35 @@ details.io-script>div{margin-top:4px;font-size:11.5px;line-height:1.45}
 .lx-flow:hover .lx-flow-ribbon,.lx-flow:hover .lx-flow-cap{opacity:.32}   /* dim all, spotlight the hovered one */
 .lx-flow:hover .lx-flow-ribbon:hover,.lx-flow:hover .lx-flow-cap:hover{opacity:1}
 .lx-flow a{cursor:pointer}   /* inputs link to their source tx, spent outputs to their spender */
+/* Transaction graph (funders -> this tx -> spenders): static node-link SVG, links are real <a>. */
+.lx-txg{display:block;width:100%;height:auto;max-height:560px;background:var(--bg);border-radius:var(--r-sm)}
+.lx-txg-edge{fill:none;stroke:var(--border);opacity:.6;transition:opacity .12s ease}
+.lx-txg:hover .lx-txg-edge{opacity:.25}
+.lx-txg:hover .lx-txg-edge:hover{opacity:1}
+.lx-txg-box{fill:var(--surface);stroke:var(--border);stroke-width:1;transition:stroke .12s ease}
+.lx-txg-box.this{fill:#e0a33a;stroke:#e0a33a}
+.lx-txg-box.unspent{fill:none;stroke:var(--border);stroke-dasharray:3 3}
+.lx-txg-lbl{fill:var(--text);font-family:var(--mono);font-size:13px;font-weight:600;dominant-baseline:central;text-anchor:middle;pointer-events:none}
+.lx-txg-lbl.this{fill:#14161b}
+.lx-txg-lbl.muted{fill:var(--muted)}
+.lx-txg a{cursor:pointer}
+.lx-txg a:hover .lx-txg-box{stroke:var(--accent-soft)}
+/* Transaction diagram toggle: Graph (node-link) vs Flow (bowtie); default graph, JS sets data-txviz. */
+.txviz-seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;flex:none}
+.txviz-btn{background:var(--surface);color:var(--muted);border:0;padding:.34em .82em;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;line-height:1.4}
+.txviz-btn+.txviz-btn{border-left:1px solid var(--border)}
+.txviz-btn:hover{color:var(--text)}
+/* Active state is attribute-driven (not a JS class) so it is correct at first paint once
+   theme-init sets data-txviz, matching the pane it shows. Graph is the default-active view. */
+.txviz-btn[data-txviz-set="graph"]{background:var(--accent-bg);color:var(--accent)}
+html[data-txviz="flow"] .txviz-btn[data-txviz-set="graph"]{background:var(--surface);color:var(--muted)}
+html[data-txviz="flow"] .txviz-btn[data-txviz-set="graph"]:hover{color:var(--text)}   /* keep hover feedback (this rule would otherwise outrank .txviz-btn:hover) */
+html[data-txviz="flow"] .txviz-btn[data-txviz-set="flow"]{background:var(--accent-bg);color:var(--accent)}
+.txviz-btn:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent)}   /* inset so overflow:hidden can't clip it */
+[data-txviz-pane="flow"]{display:none}   /* graph is the default view */
+html[data-txviz="flow"] [data-txviz-pane="flow"]{display:block}
+html[data-txviz="flow"] [data-txviz-pane="graph"]{display:none}
+.txviz-cap{margin:.6em 0 0}
 /* aspect-ratio matches the SVG viewBox (100/28) so cells never distort; short but fine on mobile */
 .lx-treemap{display:block;width:100%;aspect-ratio:100/28;max-height:340px;border-radius:var(--r-sm);overflow:hidden;background:var(--surface)}
 .lx-treemap rect{stroke:var(--bg);stroke-width:1px;vector-effect:non-scaling-stroke;transition:opacity .12s ease}
@@ -242,12 +285,13 @@ details.io-script>div{margin-top:4px;font-size:11.5px;line-height:1.45}
 .period-sel a:hover{color:var(--text);border-color:var(--accent-dim);text-decoration:none}
 .period-sel a.on{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-dim)}
 /* nav display-currency selector */
-.ccy-sel{background:var(--surface);border:1px solid var(--border);color:var(--text);height:34px;border-radius:var(--pill);cursor:pointer;font-size:13px;font-weight:600;padding:0 8px;flex:none}
-.ccy-sel:hover{color:var(--text);border-color:var(--accent-dim)}
+.ccy-sel,.denom-sel{background:var(--surface);border:1px solid var(--border);color:var(--text);height:34px;border-radius:var(--pill);cursor:pointer;font-size:13px;font-weight:600;padding:0 8px;flex:none}
+.ccy-sel:hover,.denom-sel:hover{color:var(--text);border-color:var(--accent-dim)}
 /* sortable table headers */
 .th-sort{cursor:pointer;user-select:none}
 .th-sort:hover{color:var(--text)}
-.th-sort[data-dir]::after{content:"\25B2";font-size:8px;margin-left:5px;opacity:.75;vertical-align:1px}
+.th-sort::after{content:"\2195";font-size:8px;margin-left:5px;opacity:.35;vertical-align:1px}   /* dimmed up/down cue before any sort */
+.th-sort[data-dir]::after{content:"\25B2";opacity:.8}
 .th-sort[data-dir=desc]::after{content:"\25BC"}
 .pool-name{width:132px;flex:none;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .poolbar{display:inline-block;width:96px;max-width:34vw;height:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--pill);overflow:hidden;vertical-align:middle;margin-right:8px}
@@ -307,7 +351,7 @@ footer a{color:var(--muted)} footer a:hover{color:var(--text)}
   .nav-links a:hover,.nav-links .netpill:hover{background:var(--surface)}
   .nav-links .netpill.active{background:var(--accent-bg)}
   .theme-toggle{min-width:40px;min-height:44px;align-self:flex-start}
-  .ccy-sel{min-height:44px;align-self:flex-start}
+  .ccy-sel,.denom-sel{min-height:44px;align-self:flex-start}
 }
 @media (max-width:600px){
   /* --- layout gutters / vertical rhythm (primary: "too spaced apart") --- */
@@ -353,7 +397,7 @@ footer a{color:var(--muted)} footer a:hover{color:var(--text)}
   table.kv tr{display:block;border-bottom:1px solid var(--border)}
   table.kv tr:last-child{border-bottom:none}
   .blocks-tbl th:nth-child(5),.blocks-tbl td:nth-child(5){display:none}
-  .mweb-recent th:nth-child(4),.mweb-recent td:nth-child(4){display:none}
+  .mweb-recent th:nth-child(6),.mweb-recent td:nth-child(6){display:none}   /* drop HogEx, keep the peg-in/peg-out pair together */
   .peg-tbl th:nth-child(2),.peg-tbl td:nth-child(2){display:none}
 
   /* --- tx inputs/outputs density --- */
@@ -366,6 +410,10 @@ footer a{color:var(--muted)} footer a:hover{color:var(--text)}
   /* --- forms (iOS no-zoom) + tap targets --- */
   textarea,input[type=text],input[type=password]{font-size:16px}
   .row label.sub{display:inline-flex;align-items:center;gap:6px;min-height:40px;cursor:pointer}
+  /* keep every interactive control at a comfortable touch size (matches the 40-44px elsewhere) */
+  .blk-step{display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px}
+  .txviz-btn{min-height:40px}
+  .period-sel a,.range-tog a{min-height:38px;display:inline-flex;align-items:center}
 
   /* --- donate cards --- */
   .addr-top{gap:var(--s3)}
@@ -390,7 +438,8 @@ footer a{color:var(--muted)} footer a:hover{color:var(--text)}
 .table-wrap{min-width:0;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 a:focus-visible,.nav-links a:focus-visible,.netpill:focus-visible,.brand:focus-visible,
 .btn:focus-visible,.theme-toggle:focus-visible,.nav-burger:focus-visible,
-summary:focus-visible,input:focus-visible,.search input:focus-visible{
+summary:focus-visible,input:focus-visible,.search input:focus-visible,
+.th-sort:focus-visible,.ccy-sel:focus-visible,select:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px}
 .skip-link{position:absolute;left:-999px;top:0;background:var(--accent);color:#fff;
   padding:8px 14px;border-radius:0 0 var(--r-sm) 0;z-index:100}

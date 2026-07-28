@@ -295,10 +295,10 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       <?php foreach ($recent as $b): ?>
         <tr>
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $b['height'] ?>"><?= commas($b['height']) ?></a></td>
-          <td class="amt" data-sort="<?= (int) ($b['block_time'] ?? 0) ?>"><?= !empty($b['block_time']) ? h(time_ago((int) $b['block_time'])) : '<span class="muted">-</span>' ?></td>
-          <td class="amt"><?php if ($b['pegin_count'] > 0): ?><?= commas($b['pegin_count']) ?> <span class="muted">·</span> <?= h(lx_coin((int) $b['pegin_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?php if ($b['pegout_count'] > 0): ?><?= commas($b['pegout_count']) ?> <span class="muted">·</span> <?= h(lx_coin((int) $b['pegout_total_sat'])) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?= $b['supply_sat'] !== null ? h(lx_coin((int) $b['supply_sat'])) : '<span class="muted">-</span>' ?></td>
+          <td class="amt" data-sort="<?= (int) ($b['block_time'] ?? 0) ?>"<?= !empty($b['block_time']) ? ' title="' . h(gmdate('Y-m-d H:i', (int) $b['block_time'])) . ' UTC"' : '' ?>><?= !empty($b['block_time']) ? h(time_ago((int) $b['block_time'])) : '<span class="muted">-</span>' ?></td>
+          <td class="amt"><?php if ($b['pegin_count'] > 0): ?><?= commas($b['pegin_count']) ?> <span class="muted">·</span> <?= lx_amount_el($net, (int) $b['pegin_total_sat'], false) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?php if ($b['pegout_count'] > 0): ?><?= commas($b['pegout_count']) ?> <span class="muted">·</span> <?= lx_amount_el($net, (int) $b['pegout_total_sat'], false) ?><?php else: ?><span class="muted">-</span><?php endif; ?></td>
+          <td class="amt"><?= $b['supply_sat'] !== null ? lx_amount_el($net, (int) $b['supply_sat'], false) : '<span class="muted">-</span>' ?></td>
           <td class="mono"><?php if (!empty($b['hogex_txid'])): ?><a class="addr" href="<?= h(lx_tx_href($net, $b['hogex_txid'])) ?>"><?= h(shorten($b['hogex_txid'])) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
@@ -324,7 +324,7 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
         <tr>
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $p['block_height'] ?>"><?= commas($p['block_height']) ?></a></td>
           <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $p['txid'])) ?>#out-<?= (int) $p['vout'] ?>"><?= h(shorten($p['txid'])) ?></a></td>
-          <td class="amt"><?= h(lx_coin((int) $p['value_sat'])) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $p['value_sat'], false) ?></td>
         </tr>
       <?php endforeach; ?>
       <?php if (!$pegins['pegins']): ?><tr><td colspan="3"><div class="empty"><?= lx_icon('inbox') ?><span>No peg-ins indexed.</span></div></td></tr><?php endif; ?>
@@ -347,7 +347,7 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
           <td><a href="<?= h($base) ?>/block-height/<?= (int) $p['block_height'] ?>"><?= commas($p['block_height']) ?></a></td>
           <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $p['txid'])) ?>"><?= h(shorten($p['txid'])) ?></a></td>
           <td class="mono"><?php if (!empty($p['address'])): ?><a class="addr" href="<?= h(lx_addr_href($net, $p['address'])) ?>"><?= h(shorten($p['address'], 12, 6)) ?></a><?php else: ?><span class="muted">-</span><?php endif; ?></td>
-          <td class="amt"><?= h(lx_coin((int) $p['value_sat'])) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $p['value_sat'], false) ?></td>
         </tr>
       <?php endforeach; ?>
       <?php if (!$pegouts['pegouts']): ?><tr><td colspan="4"><div class="empty"><?= lx_icon('inbox') ?><span>No peg-outs indexed.</span></div></td></tr><?php endif; ?>
@@ -371,7 +371,7 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
         <tr>
           <td class="mono"><a class="addr" href="<?= h(lx_addr_href($net, $c['address'])) ?>"><?= h(shorten($c['address'], 12, 6)) ?></a></td>
           <td class="amt"><?= commas($c['count']) ?></td>
-          <td class="amt"><?= h(lx_coin((int) $c['total_sat'])) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) $c['total_sat'], false) ?></td>
           <td class="amt mono" data-sort="<?= (int) $c['last_h'] ?>"><?= commas($c['first_h']) ?><span class="muted">-</span><?= commas($c['last_h']) ?></td>
         </tr>
       <?php endforeach; ?>
@@ -408,7 +408,7 @@ lx_head($net, ['title' => 'MWEB - ' . $net['label'] . ' Explorer']);
       </div>
     </details>
     <details>
-      <summary><?= lx_icon('target') ?>Common mistakes that deanonymize you</summary>
+      <summary><?= lx_icon('target') ?>Common mistakes that deanonymise you</summary>
       <div>
         <ul>
           <li><b>Round-trip linkage:</b> peg in <em>X</em>, then peg out ~<em>X</em> a few blocks later; amount plus timing ties the two public transactions together.</li>

@@ -113,7 +113,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
         <div class="blk-fee" style="color:<?= h($bc) ?>"><?= h(number_format($b['med_feerate'], 1)) ?> <span class="blk-unit">sat/vB</span></div>
         <?php if ($b['max_feerate'] > $b['min_feerate']): ?><div class="blk-range"><?= h(number_format($b['min_feerate'], 1)) ?>-<?= h(number_format($b['max_feerate'], 1)) ?></div><?php endif; ?>
         <div class="blk-meta"><?= commas($b['txs']) ?> tx · <?= h(lx_size_str((int) $b['size'], 'B')) ?></div>
-        <div class="blk-age" data-time="<?= (int) $b['time'] ?>"><?= h(time_ago($b['time'])) ?></div>
+        <div class="blk-age" data-time="<?= (int) $b['time'] ?>" title="<?= h(gmdate('Y-m-d H:i', (int) $b['time'])) ?> UTC"><?= h(time_ago($b['time'])) ?></div>
       </a>
       <?php endforeach; ?>
     </div>
@@ -149,7 +149,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
       <?php endif; ?>
       <div class="stat"><div class="muted sub"><?= lx_icon('layers') ?>Mempool</div><div class="big-num sm"><?= commas($mem['count']) ?></div><div class="muted sub">transactions</div></div>
       <div class="stat"><div class="muted sub"><?= lx_icon('layers') ?>Mempool size</div><div class="big-num sm"><?= h(number_format($mem['vsize'] / 1000000, 2)) ?></div><div class="muted sub">vMB</div></div>
-      <div class="stat"><div class="muted sub"><?= lx_icon('trending-up') ?>Mempool fees</div><div class="big-num sm"><?= h(lx_coin($mem['total_fee'])) ?></div><div class="muted sub"><?= h($net['unit']) ?></div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('trending-up') ?>Mempool fees</div><div class="big-num sm"><?= lx_amount_el($net, (int) $mem['total_fee'], 'ext') ?></div><div class="muted sub denom-unit"><?= h($net['unit']) ?></div></div>
       <?php if (($mem['max'] ?? 0) > 0): ?><div class="stat"><div class="muted sub"><?= lx_icon('database') ?>Mempool memory</div><div class="big-num sm"><?= h(lx_size_str((int) $mem['usage'], 'B')) ?></div><div class="muted sub">of <?= h(lx_size_str((int) $mem['max'], 'B')) ?></div></div><?php endif; ?>
     </div>
   </div>
@@ -162,11 +162,11 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
   <div class="card-b">
     <div class="stat-grid">
       <div class="stat"><div class="muted sub"><?= lx_icon('layers') ?>Mined supply</div><div class="big-num sm"><?= commas(intdiv($supply['mined_sat'], 100000000)) ?></div><div class="muted sub"><?= h(number_format($supply['pct_mined'], 2)) ?>% of <?= commas(intdiv($supply['max_supply_sat'], 100000000)) ?></div></div>
-      <div class="stat"><div class="muted sub"><?= lx_icon('gift') ?>Block reward</div><div class="big-num sm"><?= h(lx_coin($supply['reward_sat'])) ?></div><div class="muted sub">next <?= h(lx_coin($supply['next_reward_sat'])) ?></div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('gift') ?>Block reward</div><div class="big-num sm"><?= lx_amount_el($net, (int) $supply['reward_sat'], false) ?></div><div class="muted sub">next <?= lx_amount_el($net, (int) $supply['next_reward_sat'], false) ?></div></div>
       <?php if ($ltcPriceNow !== null): ?><div class="stat"><div class="muted sub"><?= lx_icon('trending-up') ?>Market cap</div><div class="big-num sm"><span class="fiat" data-sat="<?= (int) $supply['mined_sat'] ?>" data-compact="1"><?= h($priceSym . lx_num_compact($supply['mined_sat'] / 100000000 * $ltcPriceNow)) ?></span></div><div class="muted sub ccy-label"><?= h($priceCode) ?></div></div><?php endif; ?>
     </div>
     <div class="progress" role="img" aria-label="Progress to next halving"><span style="width:<?= h(number_format(min(100, max(0, $supply['halving_progress'])), 2)) ?>%"></span></div>
-    <p class="muted sub">Next halving at block <?= commas($supply['next_halving']) ?>, <?= commas($supply['blocks_to_halving']) ?> blocks left (~<?= h(gmdate('Y-m-d', $supply['halving_eta'])) ?>), reward &rarr; <?= h(lx_coin($supply['next_reward_sat'])) ?> <?= h($net['unit']) ?></p>
+    <p class="muted sub">Next halving at block <?= commas($supply['next_halving']) ?>, <?= commas($supply['blocks_to_halving']) ?> blocks left (~<?= h(gmdate('Y-m-d', $supply['halving_eta'])) ?>), reward &rarr; <?= lx_amount_el($net, (int) $supply['next_reward_sat']) ?></p>
   </div>
 </div>
 <?php endif; ?>
@@ -230,9 +230,9 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
   <div class="card-h"><span><?= lx_icon('mweb') ?>MWEB</span> <a class="sub" href="<?= h(lx_u($net)) ?>/mweb">Privacy &amp; peg history &rarr;</a></div>
   <div class="card-b">
     <div class="stat-grid">
-      <div class="stat"><div class="muted sub"><?= lx_icon('lock') ?>Shielded supply</div><div class="big-num sm"><?= h(lx_coin($mwebTot['supply_sat'])) ?></div><div class="muted sub"><?= h($net['unit']) ?> in MWEB</div></div>
-      <div class="stat"><div class="muted sub"><?= lx_icon('log-in') ?>Pegged in</div><div class="big-num sm"><?= h(lx_coin($mwebTot['pegin_total_sat'])) ?></div><div class="muted sub"><?= commas($mwebTot['pegin_count']) ?> peg-ins</div></div>
-      <div class="stat"><div class="muted sub"><?= lx_icon('log-out') ?>Pegged out</div><div class="big-num sm"><?= h(lx_coin($mwebTot['pegout_total_sat'])) ?></div><div class="muted sub"><?= commas($mwebTot['pegout_count']) ?> peg-outs</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('lock') ?>Shielded supply</div><div class="big-num sm"><?= lx_amount_el($net, (int) $mwebTot['supply_sat'], 'ext') ?></div><div class="muted sub"><span class="denom-unit"><?= h($net['unit']) ?></span> in MWEB</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-in') ?>Pegged in</div><div class="big-num sm"><?= lx_amount_el($net, (int) $mwebTot['pegin_total_sat'], false) ?></div><div class="muted sub"><?= commas($mwebTot['pegin_count']) ?> peg-ins</div></div>
+      <div class="stat"><div class="muted sub"><?= lx_icon('log-out') ?>Pegged out</div><div class="big-num sm"><?= lx_amount_el($net, (int) $mwebTot['pegout_total_sat'], false) ?></div><div class="muted sub"><?= commas($mwebTot['pegout_count']) ?> peg-outs</div></div>
     </div>
   </div>
 </div>
@@ -250,7 +250,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
             <td><a href="<?= h(lx_block_href($net, $b['id'])) ?>"><?= commas($b['height']) ?></a></td>
             <td class="mono"><a class="addr" href="<?= h(lx_block_href($net, $b['id'])) ?>"><?= h(shorten($b['id'], 8, 6)) ?></a></td>
             <td class="amt"><?= commas($b['tx_count']) ?></td>
-            <td class="amt age" data-sort="<?= (int) $b['timestamp'] ?>" data-time="<?= (int) $b['timestamp'] ?>"><?= h(time_ago($b['timestamp'])) ?></td>
+            <td class="amt age" data-sort="<?= (int) $b['timestamp'] ?>" data-time="<?= (int) $b['timestamp'] ?>" title="<?= h(gmdate('Y-m-d H:i', (int) $b['timestamp'])) ?> UTC"><?= h(time_ago($b['timestamp'])) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -267,7 +267,7 @@ $ltcPriceStr = $ltcPriceNow !== null ? $priceSym . number_format($ltcPriceNow, $
         <?php foreach ($recentTxs as $t): ?>
           <tr>
             <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $t['txid'])) ?>"><?= h(shorten($t['txid'], 8, 6)) ?></a></td>
-            <td class="amt"><?= h(lx_coin($t['value'])) ?></td>
+            <td class="amt"><?= lx_amount_el($net, (int) $t['value'], false) ?></td>
             <td class="amt"><?= commas($t['vsize'] > 0 ? round($t['fee'] / $t['vsize']) : 0) ?> <span class="muted">sat/vB</span></td>
           </tr>
         <?php endforeach; ?>

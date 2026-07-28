@@ -9,3 +9,12 @@
     document.documentElement.setAttribute('data-theme', t);
   } catch (e) { /* default dark from markup */ }
 })();
+/* No-flash transaction diagram: graph is the CSS default, so only the "flow" choice needs
+   pre-painting. Sets the same data-txviz attribute app.js uses, before the tx card renders. */
+(function () {
+  try {
+    if (localStorage.getItem('lx-txviz') === 'flow') {
+      document.documentElement.setAttribute('data-txviz', 'flow');
+    }
+  } catch (e) { /* graph default from CSS */ }
+})();

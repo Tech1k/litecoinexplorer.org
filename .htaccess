@@ -13,7 +13,7 @@ LimitRequestBody 2097152
 # ---- block source / data / config ----------------------------------------
 RewriteEngine On
 
-# The /tools EXPLORER PAGE must route to the front controller — the physical tools/
+# The /tools EXPLORER PAGE must route to the front controller or the physical tools/
 # directory (CLI scripts) would otherwise shadow it (dir passthrough -> 403). Route the
 # bare page first, before the deny + dir rules below claim it.
 RewriteRule ^tools/?$ index.php [L]

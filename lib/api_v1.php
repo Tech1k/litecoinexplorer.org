@@ -328,9 +328,13 @@ function lx_blocks_bulk_api(array $net, int $min, int $max): array
     $max = min($max, lx_tip_height($net));
     $min = max(0, $min);
     if ($max - $min > 99) { $min = $max - 99; }    // cap 100 blocks per call
+    if ($max < $min) { return []; }                // requested range is entirely above the tip; range() would count upward and allocate the whole gap
     $out = [];
-    for ($h = $max; $h >= $min; $h--) {
-        $hash = lx_block_hash_at($net, $h);
+    $heights = range($max, $min);                  // descending, newest first
+    $hashes = lx_block_hashes($net, $heights);     // one getblockhash batch instead of a serial call per height
+    lx_warm_block_stats($net, $hashes);            // one getblockstats batch so per-block lx_block_stats hits cache
+    foreach ($heights as $h) {
+        $hash = $hashes[$h] ?? null;
         if ($hash === null) { continue; }
         $ext = lx_ws_block_extended($net, $hash);
         if ($ext) { $out[] = $ext; }

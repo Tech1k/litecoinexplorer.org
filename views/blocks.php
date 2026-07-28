@@ -29,9 +29,9 @@ lx_head($net, ['title' => 'Blocks - ' . $net['label'] . ' Explorer']);
           <td class="amt"><?= commas($b['tx_count']) ?></td>
           <td class="amt"><?= commas(round($b['size'] / 1000)) ?> kB</td>
           <td class="amt"><?= commas(round($b['weight'] / 1000)) ?> kWU</td>
-          <td class="amt"><?= $bs ? h(lx_coin((int) $bs['total_fee'])) : '<span class="muted">&ndash;</span>' ?></td>
+          <td class="amt"><?= $bs ? lx_amount_el($net, (int) $bs['total_fee'], false) : '<span class="muted">&ndash;</span>' ?></td>
           <td><?php if ($pl['pool'] !== null): ?><a class="badge soft" href="<?= h($base) ?>/mining/<?= h(rawurlencode($pl['label'])) ?>"><?= h($pl['label']) ?></a><?php elseif ($pl['label'] !== 'Unknown'): ?><span class="mono sub"><?= h(shorten($pl['label'], 10, 4)) ?></span><?php else: ?><span class="muted">Unknown</span><?php endif; ?></td>
-          <td class="amt" data-sort="<?= (int) $b['timestamp'] ?>"><?= h(time_ago($b['timestamp'])) ?></td>
+          <td class="amt" data-sort="<?= (int) $b['timestamp'] ?>" title="<?= h(gmdate('Y-m-d H:i', (int) $b['timestamp'])) ?> UTC"><?= h(time_ago($b['timestamp'])) ?></td>
         </tr>
       <?php endforeach; ?>
       <?php if (!$blocks): ?><tr><td colspan="8"><div class="empty"><?= lx_icon('inbox') ?><span>No blocks.</span></div></td></tr><?php endif; ?>

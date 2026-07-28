@@ -251,14 +251,24 @@
     });
   }
 
-  // Copy buttons (donation addresses, etc.).
+  // Copy buttons (donation addresses, txids, tx/xpub addresses, etc.).
+  var copyLive = document.getElementById('copy-live');
   document.querySelectorAll('[data-copy]').forEach(function (b) {
     b.addEventListener('click', function () {
       var v = b.dataset.copy;
       var done = function () {
-        var t = b.textContent;
-        b.textContent = 'Copied!';
-        setTimeout(function () { b.textContent = t; }, 1400);
+        if (b.children.length) {                 // icon button: keep the icon, flash a state class
+          b.classList.add('copied');
+          setTimeout(function () { b.classList.remove('copied'); }, 1400);
+        } else {                                 // text button: swap the visible label
+          var t = b.textContent;
+          b.textContent = 'Copied!';
+          setTimeout(function () { b.textContent = t; }, 1400);
+        }
+        if (copyLive) {                          // announce to screen readers regardless of button type
+          copyLive.textContent = 'Copied to clipboard';
+          setTimeout(function () { copyLive.textContent = ''; }, 1400);
+        }
       };
       if (navigator.clipboard) {
         navigator.clipboard.writeText(v).then(done).catch(function () {});
@@ -270,6 +280,20 @@
       }
     });
   });
+
+  // Reveal a collapsed <details> (e.g. capped tx inputs/outputs) when an in-page anchor
+  // targets an element inside it, then scroll to it.
+  function revealHashTarget() {
+    if (location.hash.length < 2) { return; }
+    var el;
+    try { el = document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (e) { return; }
+    if (!el || !el.closest) { return; }
+    var d = el.closest('details'), opened = false;
+    while (d) { if (!d.open) { d.open = true; opened = true; } d = d.parentElement ? d.parentElement.closest('details') : null; }
+    if (opened && el.scrollIntoView) { el.scrollIntoView(); }
+  }
+  revealHashTarget();
+  window.addEventListener('hashchange', revealHashTarget);
 
   // Sortable tables: click a column header to sort rows (numeric-aware), toggle dir.
   function cellVal(td) {
@@ -452,6 +476,75 @@
     });
     svg.addEventListener('mouseleave', tipHide);
   });
+
+  // Transaction diagram toggle: Graph (node-link) vs Flow (bowtie). Persisted in localStorage
+  // and applied via data-txviz on <html> so CSS swaps the visible pane. Default is graph.
+  (function () {
+    var seg = document.querySelector('.txviz-seg');
+    if (!seg) { return; }
+    function apply(v) {
+      v = (v === 'flow') ? 'flow' : 'graph';
+      root.setAttribute('data-txviz', v);
+      var btns = seg.querySelectorAll('.txviz-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var on = btns[i].getAttribute('data-txviz-set') === v;
+        btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');   // highlight is CSS/attribute-driven; JS only owns aria state
+      }
+      return v;
+    }
+    var stored = null;
+    try { stored = localStorage.getItem('lx-txviz'); } catch (e) {}
+    apply(stored);
+    seg.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest ? e.target.closest('.txviz-btn') : null;
+      if (!b) { return; }
+      var v = apply(b.getAttribute('data-txviz-set'));
+      try { localStorage.setItem('lx-txviz', v); } catch (e2) {}
+    });
+  })();
+
+  // Amount denomination selector: LTC (server default) / mLTC / litoshi. Re-denominates the
+  // .lx-amt[data-sat] spans client-side, persisted in localStorage. Mirrors the currency selector.
+  (function () {
+    var sel = document.getElementById('denom-sel');
+    if (!sel) { return; }
+    var els = document.querySelectorAll('.lx-amt[data-sat]');
+    var units = document.querySelectorAll('.denom-unit');   // standalone unit labels on big-num stat cards
+    // Format from the data-sat STRING, never a float: cumulative address totals can exceed
+    // 2^53 sats, where parseInt would lose low-order digits.
+    function grp(s) { return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function litFmt(s) { var n = s.charAt(0) === '-'; if (n) { s = s.slice(1); } return (n ? '-' : '') + grp(s); }
+    function mltcFmt(s) {                                   // mLTC = sats / 1e5: last five digits are fractional
+      var n = s.charAt(0) === '-'; if (n) { s = s.slice(1); }
+      while (s.length < 6) { s = '0' + s; }
+      var ip = grp(s.slice(0, -5)), fp = s.slice(-5).replace(/0+$/, '');
+      return (n ? '-' : '') + ip + (fp ? '.' + fp : '');
+    }
+    function apply(d) {
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        var raw = el.getAttribute('data-sat');
+        if (!/^-?\d+$/.test(raw)) { continue; }
+        if (el.dataset.orig == null) { el.dataset.orig = el.textContent; }   // capture the server LTC text once
+        var u = el.dataset.extunit ? '' : (d === 'lit' ? ' lit' : ' mLTC');  // ext spans get their unit from a sibling .denom-unit label
+        if (d === 'lit') { el.textContent = litFmt(raw) + u; }
+        else if (d === 'mltc') { el.textContent = mltcFmt(raw) + u; }
+        else { el.textContent = el.dataset.orig; }   // ltc: restore the exact server rendering
+      }
+      var ul = d === 'lit' ? 'lit' : (d === 'mltc' ? 'mLTC' : 'LTC');
+      for (var k = 0; k < units.length; k++) { units[k].textContent = ul; }
+    }
+    var stored = null;
+    try { stored = localStorage.getItem('lx-denom'); } catch (e) {}
+    var cur = (stored === 'lit' || stored === 'mltc') ? stored : 'ltc';
+    sel.value = cur;
+    if (cur !== 'ltc') { apply(cur); }               // server already rendered LTC; only rewrite otherwise
+    sel.addEventListener('change', function () {
+      cur = (sel.value === 'lit' || sel.value === 'mltc') ? sel.value : 'ltc';
+      try { localStorage.setItem('lx-denom', cur); } catch (e) {}
+      apply(cur);
+    });
+  })();
 
   // PWA: register the service worker for offline shell + asset caching.
   if ('serviceWorker' in navigator) {

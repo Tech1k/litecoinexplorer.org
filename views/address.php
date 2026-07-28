@@ -120,11 +120,11 @@ lx_head($net, [
       </div>
     </div>
     <div class="stat-grid mt-3">
-      <div class="stat<?= $balance > 0 ? ' hot' : '' ?>"><div class="muted sub">Balance</div><div class="big-num sm"><?= h(lx_amount($net, $balance)) ?></div>
+      <div class="stat<?= $balance > 0 ? ' hot' : '' ?>"><div class="muted sub">Balance</div><div class="big-num sm"><?= lx_amount_el($net, (int) $balance) ?></div>
         <?php if (($balFiat = lx_fiat_el((int) $balance, lx_price_now($net))) !== ''): ?><div class="muted sub">&asymp; <?= $balFiat ?></div><?php endif; ?>
-        <?php if ($pending): ?><div class="muted sub"><?= h(lx_coin($pending)) ?> pending</div><?php endif; ?></div>
-      <div class="stat"><div class="muted sub">Received</div><div><?= h(lx_amount($net, $c['funded_txo_sum'])) ?></div></div>
-      <div class="stat"><div class="muted sub">Sent</div><div><?= h(lx_amount($net, $c['spent_txo_sum'])) ?></div></div>
+        <?php if ($pending): ?><div class="muted sub"><?= lx_amount_el($net, (int) $pending, false) ?> pending</div><?php endif; ?></div>
+      <div class="stat"><div class="muted sub">Received</div><div><?= lx_amount_el($net, (int) $c['funded_txo_sum']) ?></div></div>
+      <div class="stat"><div class="muted sub">Sent</div><div><?= lx_amount_el($net, (int) $c['spent_txo_sum']) ?></div></div>
       <div class="stat"><div class="muted sub">Transactions</div><div><?= commas($txTotal) ?></div></div>
     </div>
     <table class="kv mt-3">
@@ -166,8 +166,8 @@ lx_head($net, [
           <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $tx['txid'])) ?>"><?= h(shorten($tx['txid'])) ?></a></td>
           <td data-sort="<?= (int) ($tx['status']['block_time'] ?? 0) ?>"><?php if (empty($tx['status']['confirmed'])): ?><span class="badge warn">pending</span><?php else: ?>
             <a href="<?= h(lx_block_href($net, $tx['status']['block_hash'])) ?>"><?= commas($tx['status']['block_height']) ?></a>
-            <span class="muted sub"><?= h(time_ago((int) ($tx['status']['block_time'] ?? 0))) ?></span><?php endif; ?></td>
-          <td class="amt <?= $delta >= 0 ? 'pos' : 'neg' ?>"><span class="delta"><?= ($delta >= 0 ? '+' : '') . h(lx_coin($delta)) ?></span></td>
+            <span class="muted sub" title="<?= h(gmdate('Y-m-d H:i', (int) ($tx['status']['block_time'] ?? 0))) ?> UTC"><?= h(time_ago((int) ($tx['status']['block_time'] ?? 0))) ?></span><?php endif; ?></td>
+          <td class="amt <?= $delta >= 0 ? 'pos' : 'neg' ?>"><span class="delta"><?= ($delta >= 0 ? '+' : '') . lx_amount_el($net, (int) $delta, false) ?></span></td>
         </tr>
       <?php endforeach; ?>
       <?php if (!$txs): ?><tr><td colspan="3"><div class="empty"><?= lx_icon('inbox') ?><span>No transactions.</span></div></td></tr><?php endif; ?>

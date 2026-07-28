@@ -34,7 +34,7 @@ lx_head($net, [
     <div class="stat-grid">
       <div class="stat"><div class="muted sub">Transactions</div><div class="big-num sm"><?= commas($mem['count']) ?></div></div>
       <div class="stat"><div class="muted sub">Virtual size</div><div><?= commas(round($mem['vsize'] / 1000)) ?> kvB</div></div>
-      <div class="stat"><div class="muted sub">Total fees</div><div><?= h(lx_amount($net, $mem['total_fee'])) ?></div></div>
+      <div class="stat"><div class="muted sub">Total fees</div><div><?= lx_amount_el($net, (int) $mem['total_fee']) ?></div></div>
       <?php if ($fees): ?>
       <div class="stat"><div class="muted sub">Next block</div><div><?= commas($fees['fastestFee']) ?> sat/vB</div></div>
       <?php endif; ?>
@@ -61,7 +61,7 @@ if ($proj):
       <div class="stat"><div class="muted sub">Median fee</div><div class="big-num sm" style="color:<?= h(lx_feerate_color($nb['med'])) ?>"><?= h(number_format($nb['med'], 1)) ?> <span class="blk-unit">sat/vB</span></div></div>
       <div class="stat"><div class="muted sub">Fee range</div><div><?= h($fr($nb['min'])) ?> &ndash; <?= h($fr($nb['max'])) ?> <span class="muted sub">sat/vB</span></div><div class="muted sub">avg <?= h(number_format($avgR, 1)) ?></div></div>
       <div class="stat"><div class="muted sub">Transactions</div><div class="big-num sm"><?= commas($nb['count']) ?></div></div>
-      <div class="stat"><div class="muted sub">Total fees</div><div><?= h(lx_amount($net, (int) $nb['fee'])) ?></div></div>
+      <div class="stat"><div class="muted sub">Total fees</div><div><?= lx_amount_el($net, (int) $nb['fee']) ?></div></div>
       <div class="stat"><div class="muted sub">Virtual size</div><div><?= h(lx_size_str($nbVs, 'vB')) ?> <span class="muted sub"><?= h(number_format($cap, $cap >= 99.5 ? 0 : 1)) ?>%</span></div></div>
       <div class="stat"><div class="muted sub">Expected in</div><div><?= $nb['partial'] ? 'this block' : '~' . max(1, round($spacing / 60)) . ' min' ?></div></div>
     </div>
@@ -203,8 +203,8 @@ if ($proj):
         <?php $vs = (int) ($t['vsize'] ?? 0); $rate = $vs > 0 ? ($t['fee'] ?? 0) / $vs : 0; ?>
         <tr>
           <td class="mono"><a class="addr" href="<?= h(lx_tx_href($net, $t['txid'])) ?>"><?= h(shorten($t['txid'])) ?></a></td>
-          <td class="amt"><?= h(lx_coin((int) ($t['value'] ?? 0))) ?></td>
-          <td class="amt"><?= h(lx_coin($t['fee'] ?? 0)) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) ($t['value'] ?? 0), false) ?></td>
+          <td class="amt"><?= lx_amount_el($net, (int) ($t['fee'] ?? 0), false) ?></td>
           <td class="amt"><?= commas($vs) ?></td>
           <td class="amt"><?= h(number_format($rate, 1)) ?> sat/vB</td>
         </tr>

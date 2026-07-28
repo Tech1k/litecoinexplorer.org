@@ -148,7 +148,7 @@ lx_head($net, ['title' => 'Extended key ' . shorten($xpub) . ' - ' . $net['label
           <?php if ($tk === $chosen): ?><span class="badge soft"><?= h($tlabel) ?></span><?php else: ?><a class="badge" style="text-decoration:none" href="<?= h($base) ?>/xpub/<?= h(rawurlencode($xpub)) ?>?type=<?= h($tk) ?>"><?= h($tlabel) ?></a><?php endif; ?>
         <?php endforeach; ?>
       </span></td></tr>
-      <tr><th>Balance</th><td><b><?= h(lx_amount($net, (int) $data['total_balance'])) ?></b> <span class="muted">across the scanned addresses</span></td></tr>
+      <tr><th>Balance</th><td><b><?= lx_amount_el($net, (int) $data['total_balance']) ?></b> <span class="muted">across the scanned addresses</span></td></tr>
       <tr><th>Activity</th><td><?= commas($data['used']) ?> used · <?= commas($data['total_tx']) ?> transaction<?= $data['total_tx'] === 1 ? '' : 's' ?></td></tr>
     </table>
     <?php if ($qtype === null && $parsed['type'] === 'p2pkh'): ?>
@@ -168,8 +168,8 @@ lx_head($net, ['title' => 'Extended key ' . shorten($xpub) . ' - ' . $net['label
       <?php foreach ($data[$ch] as $a): ?>
         <tr<?= $a['txs'] > 0 ? '' : ' class="muted"' ?>>
           <td class="mono"><?= (int) $a['index'] ?></td>
-          <td class="mono break"><a class="addr" href="<?= h($base) ?>/address/<?= h(rawurlencode($a['address'])) ?>"><?= h($a['address']) ?></a></td>
-          <td class="amt"><?= $a['balance'] > 0 ? h(lx_coin((int) $a['balance'])) : '<span class="muted">0</span>' ?></td>
+          <td class="mono break"><a class="addr" href="<?= h($base) ?>/address/<?= h(rawurlencode($a['address'])) ?>"><?= h($a['address']) ?></a><button class="addr-copy" type="button" data-copy="<?= h($a['address']) ?>" aria-label="Copy address" title="Copy address"><?= lx_icon('copy', 'ico') ?></button></td>
+          <td class="amt"><?= $a['balance'] > 0 ? lx_amount_el($net, (int) $a['balance'], false) : '<span class="muted">0</span>' ?></td>
           <td class="amt"><?= $a['txs'] > 0 ? commas($a['txs']) : '<span class="muted">-</span>' ?></td>
         </tr>
       <?php endforeach; ?>

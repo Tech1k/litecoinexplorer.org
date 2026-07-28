@@ -143,10 +143,10 @@ lx_head($net, [
     <div class="row mt-3">
       <?php if ($mwebInfo['is_hogex']): ?>
         <span class="badge mweb">HogEx</span>
-        <span class="muted">MWEB integration transaction. Committed supply <?= h(lx_amount($net, (int) $mwebInfo['supply_sat'])) ?><?php if ($mwebInfo['pegout_total_sat'] > 0): ?>, with <?= commas(count($mwebInfo['pegouts'])) ?> peg-out(s) totalling <?= h(lx_amount($net, (int) $mwebInfo['pegout_total_sat'])) ?> back to the public chain<?php endif; ?>.</span>
+        <span class="muted">MWEB integration transaction. Committed supply <?= lx_amount_el($net, (int) $mwebInfo['supply_sat']) ?><?php if ($mwebInfo['pegout_total_sat'] > 0): ?>, with <?= commas(count($mwebInfo['pegouts'])) ?> peg-out(s) totalling <?= lx_amount_el($net, (int) $mwebInfo['pegout_total_sat']) ?> back to the public chain<?php endif; ?>.</span>
       <?php elseif ($mwebInfo['pegin_total_sat'] > 0): ?>
         <span class="badge mweb">Peg-in</span>
-        <span class="muted"><?= h(lx_amount($net, (int) $mwebInfo['pegin_total_sat'])) ?> moved into the MWEB extension block.</span>
+        <span class="muted"><?= lx_amount_el($net, (int) $mwebInfo['pegin_total_sat']) ?> moved into the MWEB extension block.</span>
       <?php endif; ?>
     </div>
       <?php if ($mwebInfo['is_hogex'] && $mwebInfo['pegout_total_sat'] > 0): ?>
@@ -182,11 +182,11 @@ lx_head($net, [
     <table class="kv mt-3">
       <tr><th>Features</th><td>
         <?php foreach ([['SegWit', $hasWitness, 'ok'], ['Taproot', $hasTaproot, 'ok'], ['RBF', $rbf, 'warn']] as $ft): ?>
-          <?php if ($ft[1]): ?><span class="badge <?= $ft[2] ?>"><?= $ft[0] ?></span><?php else: ?><span class="badge soft" style="opacity:.45;text-decoration:line-through" title="Not used by this transaction"><?= $ft[0] ?></span><?php endif; ?>
+          <?php if ($ft[1]): ?><span class="badge <?= $ft[2] ?>"><?= $ft[0] ?></span><?php else: ?><span class="badge off" title="Not used by this transaction">no <?= $ft[0] ?></span><?php endif; ?>
         <?php endforeach; ?>
       </td></tr>
       <tr><th>Fee</th><td><?php if ($isCoinbase): ?>newly minted (coinbase)<?php else: ?>
-        <?= h(lx_amount($net, $tx['fee'] ?? 0)) ?><?php if (($ff = lx_fiat_el((int) ($tx['fee'] ?? 0), $txPrice)) !== ''): ?> <span class="muted sub">&asymp; <?= $ff ?></span><?php endif; ?> <span class="badge soft"><?= h(number_format($feeRate, 2)) ?> sat/vB</span>
+        <?= lx_amount_el($net, (int) ($tx['fee'] ?? 0)) ?><?php if (($ff = lx_fiat_el((int) ($tx['fee'] ?? 0), $txPrice)) !== ''): ?> <span class="muted sub">&asymp; <?= $ff ?></span><?php endif; ?> <span class="badge soft"><?= h(number_format($feeRate, 2)) ?> sat/vB</span>
         <?php if ($pkgRate !== null && abs($pkgRate - $feeRate) > 0.01): ?>
           <span class="badge soft" title="Effective package fee-rate incl. ancestors">CPFP <?= h(number_format($pkgRate, 2)) ?> sat/vB</span>
         <?php endif; ?><?php endif; ?></td></tr>
@@ -204,7 +204,9 @@ lx_head($net, [
   <div class="card">
     <div class="card-h"><span><?= lx_icon('log-in') ?>Inputs</span> <span class="sub"><?= count($tx['vin']) ?></span></div>
     <div class="card-b nopad">
-      <?php foreach ($tx['vin'] as $vi): ?>
+      <?php $ioCap = 25; $vinN = count($tx['vin']); ?>
+      <?php foreach ($tx['vin'] as $ii => $vi): ?>
+        <?php if ($ii === $ioCap): ?><details class="io-more"><summary>Show <?= commas($vinN - $ioCap) ?> more inputs</summary><?php endif; ?>
         <div class="io-row">
           <?php if (!empty($vi['is_coinbase'])): ?>
             <?php
@@ -230,10 +232,10 @@ lx_head($net, [
               <div class="io-script mono muted break"><?php if ($cbHeight !== null): ?>height <?= commas($cbHeight) ?><?php endif; ?><?= $cbText !== '' ? ' · ' . h($cbText) : '' ?></div>
             <?php endif; ?>
           <?php else: ?>
-            <div class="io-addr"><?= lx_addr_cell($net, $vi['prevout']['scriptpubkey_address'] ?? null, $vi['prevout']['scriptpubkey_type'] ?? '') ?></div>
+            <div class="io-addr"><?= lx_addr_cell($net, $vi['prevout']['scriptpubkey_address'] ?? null, $vi['prevout']['scriptpubkey_type'] ?? '', true) ?></div>
             <div class="io-meta">
               <a class="muted mono" href="<?= h(lx_tx_href($net, $vi['txid'])) ?>#out-<?= (int) $vi['vout'] ?>"><?= h(shorten($vi['txid'], 8, 6)) ?>:<?= (int) $vi['vout'] ?></a>
-              <span class="io-val"><?= ($vi['prevout'] ?? null) ? h(lx_coin($vi['prevout']['value'])) : '?' ?></span>
+              <span class="io-val"><?= ($vi['prevout'] ?? null) ? lx_amount_el($net, (int) $vi['prevout']['value'], false) : '?' ?></span>
             </div>
             <?php if (($vi['scriptsig'] ?? '') !== '' || !empty($vi['witness'])): ?>
               <details class="io-script">
@@ -249,22 +251,27 @@ lx_head($net, [
           <?php endif; ?>
         </div>
       <?php endforeach; ?>
+      <?php if ($vinN > $ioCap): ?></details><?php endif; ?>
     </div>
   </div>
 
   <div class="card">
     <div class="card-h"><span><?= lx_icon('log-out') ?>Outputs</span> <span class="sub"><?= count($tx['vout']) ?></span></div>
     <div class="card-b nopad">
+      <?php $voutN = count($tx['vout']); ?>
       <?php foreach ($tx['vout'] as $n => $vo): ?>
+        <?php if ($n === $ioCap): ?><details class="io-more"><summary>Show <?= commas($voutN - $ioCap) ?> more outputs</summary><?php endif; ?>
         <?php $type = $vo['scriptpubkey_type'] ?? 'unknown'; $spent = $outspends[$n]['spent'] ?? null; $mwebKind = $mwebInfo ? lx_mweb_spk_kind($vo) : null; ?>
         <div class="io-row" id="out-<?= $n ?>">
-          <div class="io-addr"><?= lx_addr_cell($net, $vo['scriptpubkey_address'] ?? null, $type) ?>
+          <div class="io-addr"><?= lx_addr_cell($net, $vo['scriptpubkey_address'] ?? null, $type, true) ?>
             <span class="badge soft"><?= h(lx_spk_label($type)) ?></span>
-            <?php if ($spent === true): ?><span class="badge bad">spent</span><?php elseif ($spent === false): ?><span class="badge ok">unspent</span><?php endif; ?>
+            <?php if ($spent === true): $spTxid = $outspends[$n]['txid'] ?? null; ?>
+              <?php if ($spTxid): ?><a class="badge bad" href="<?= h(lx_tx_href($net, $spTxid)) ?>" title="Spending transaction">spent &rarr;</a><?php else: ?><span class="badge bad">spent</span><?php endif; ?>
+            <?php elseif ($spent === false): ?><span class="badge ok">unspent</span><?php endif; ?>
             <?php if ($mwebKind === 'pegin'): ?><span class="badge mweb">Peg-in (MWEB)</span><?php elseif ($mwebKind === 'hogaddr'): ?><span class="badge mweb">HogEx supply</span><?php endif; ?></div>
           <div class="io-meta">
             <span class="muted mono">#<?= $n ?></span>
-            <span class="io-val"><?= h(lx_coin($vo['value'] ?? 0)) ?></span>
+            <span class="io-val"><?= lx_amount_el($net, (int) ($vo['value'] ?? 0), false) ?></span>
           </div>
           <?php if ($type === 'op_return'): ?>
             <?php foreach (lx_parse_op_return($vo['scriptpubkey'] ?? '') as $p): ?>
@@ -283,23 +290,35 @@ lx_head($net, [
           <?php endif; ?>
         </div>
       <?php endforeach; ?>
+      <?php if ($voutN > $ioCap): ?></details><?php endif; ?>
     </div>
   </div>
 </div>
 
 <div class="card">
   <div class="card-b between">
-    <span class="muted"><?= $isCoinbase ? 'Coinbase' : ($inKnown ? lx_amount($net, $inSum) . ' in' : 'inputs') ?></span>
+    <span class="muted"><?= $isCoinbase ? 'Coinbase' : ($inKnown ? lx_amount_el($net, (int) $inSum) . ' in' : 'inputs') ?></span>
     <span class="muted" style="color:var(--brand,var(--accent))">→</span>
-    <span><span class="big-num sm"><?= h(lx_amount($net, $outSum)) ?></span> out<?php if (($of = lx_fiat_el((int) $outSum, $txPrice)) !== ''): ?> <span class="muted sub">&asymp; <?= $of ?><?php if ($histPrice !== null && ($ot = lx_fiat_str((int) $outSum, $histPrice)) !== null): ?> <span title="value at the time this block was mined">(<?= h($ot) ?> then)</span><?php endif; ?></span><?php endif; ?></span>
+    <span><span class="big-num sm"><?= lx_amount_el($net, (int) $outSum) ?></span> out<?php if (($of = lx_fiat_el((int) $outSum, $txPrice)) !== ''): ?> <span class="muted sub">&asymp; <?= $of ?><?php if ($histPrice !== null && ($ot = lx_fiat_str((int) $outSum, $histPrice)) !== null): ?> <span title="value at the time this block was mined">(<?= h($ot) ?> then)</span><?php endif; ?></span><?php endif; ?></span>
     <?php if (lx_extern_links()): ?><a class="btn ghost sm ext" href="<?= h($net['extern_tx'] . $txid) ?>" target="_blank" rel="noopener">View on <?= h($net['extern_name']) ?></a><?php endif; ?>
   </div>
 </div>
 
 <?php if (!empty($tx['vout'])): ?>
 <div class="card">
-  <div class="card-h"><span><?= lx_icon('repeat') ?>Value flow</span> <span class="sub">click an input or spent output to follow the chain</span></div>
-  <div class="card-b"><?= lx_tx_flow($net, $tx, $outspends) ?></div>
+  <div class="card-h">
+    <span><?= lx_icon('share-2') ?>Transaction diagram</span>
+    <div class="txviz-seg" role="group" aria-label="Diagram style">
+      <button type="button" class="txviz-btn" data-txviz-set="graph" aria-pressed="true">Graph</button>
+      <button type="button" class="txviz-btn" data-txviz-set="flow" aria-pressed="false">Flow</button>
+    </div>
+  </div>
+  <div class="card-b">
+    <div data-txviz-pane="graph"><?= lx_tx_graph($net, $tx, $outspends) ?></div>
+    <div data-txviz-pane="flow"><?= lx_tx_flow($net, $tx, $outspends) ?></div>
+    <p class="sub txviz-cap" data-txviz-pane="graph">funding txs &rarr; this tx &rarr; spending txs &middot; click a node to follow the chain</p>
+    <p class="sub txviz-cap" data-txviz-pane="flow">click an input or spent output to follow the chain</p>
+  </div>
 </div>
 <?php endif; ?>
 <?php lx_foot($net); ?>
